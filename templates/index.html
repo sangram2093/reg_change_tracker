@@ -1,9 +1,8 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Upload Regulation PDFs</title>
+    <title>Upload Regulation PDFs by Path</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -25,7 +24,7 @@
             display: block;
             margin-top: 15px;
         }
-        select, input[type="file"] {
+        select, input[type="text"] {
             width: 100%;
             padding: 8px;
             margin-top: 5px;
@@ -49,7 +48,7 @@
 </head>
 <body>
     <h1>Regulation Analyzer</h1>
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST">
         <label for="regulation">Select Regulation:</label>
         <select name="regulation" id="regulation" required>
             {% for reg in regulations %}
@@ -57,11 +56,11 @@
             {% endfor %}
         </select>
 
-        <label for="old_pdf">Upload Old Regulation PDF:</label>
-        <input type="file" name="old_pdf" id="old_pdf" required>
+        <label for="old_path">Path to Old Regulation PDF:</label>
+        <input type="text" name="old_path" id="old_path" required>
 
-        <label for="new_pdf">Upload New Regulation PDF:</label>
-        <input type="file" name="new_pdf" id="new_pdf" required>
+        <label for="new_path">Path to New Regulation PDF:</label>
+        <input type="text" name="new_path" id="new_path" required>
 
         <button type="submit">Process and Compare</button>
     </form>
