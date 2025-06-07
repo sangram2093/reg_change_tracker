@@ -16,28 +16,21 @@ class Upload(db.Model):
     old_path = db.Column(db.String(1024), nullable=False)
     new_path = db.Column(db.String(1024), nullable=False)
     upload_time = db.Column(db.DateTime, default=datetime.utcnow)
-    graph = db.relationship('Graph', uselist=False, backref='upload')
-    log = db.relationship('Log', uselist=False, backref='upload')
-    kop = db.relationship('KOP', uselist=False, backref='upload')
+    summary = db.relationship('Summary', uselist=False, backref='upload')
+    entities = db.relationship('EntityGraph', uselist=False, backref='upload')
 
-class Graph(db.Model):
-    __tablename__ = 'graphs'
+class Summary(db.Model):
+    __tablename__ = 'summaries'
     id = db.Column(db.Integer, primary_key=True)
     upload_id = db.Column(db.Integer, db.ForeignKey('uploads.id'), nullable=False)
-    graph_old_json = db.Column(db.Text, nullable=False)
-    graph_new_json = db.Column(db.Text, nullable=False)
-    diff_json = db.Column(db.Text)
+    old_summary = db.Column(db.Text, nullable=False)
+    new_summary = db.Column(db.Text, nullable=False)
 
-class Log(db.Model):
-    __tablename__ = 'logs'
+class EntityGraph(db.Model):
+    __tablename__ = 'entity_graphs'
     id = db.Column(db.Integer, primary_key=True)
     upload_id = db.Column(db.Integer, db.ForeignKey('uploads.id'), nullable=False)
-    summary_text = db.Column(db.Text)
-    raw_llm_response = db.Column(db.Text)
-
-class KOP(db.Model):
-    __tablename__ = 'kops'
-    id = db.Column(db.Integer, primary_key=True)
-    upload_id = db.Column(db.Integer, db.ForeignKey('uploads.id'), nullable=False)
-    kop_text = db.Column(db.Text)
-    generated_time = db.Column(db.DateTime, default=datetime.utcnow)
+    old_json = db.Column(db.Text, nullable=False)
+    new_json = db.Column(db.Text, nullable=False)
+    graph_old = db.Column(db.Text, nullable=False)  # JSON with nodes/edges
+    graph_new = db.Column(db.Text, nullable=False)
