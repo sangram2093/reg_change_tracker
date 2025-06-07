@@ -1,0 +1,71 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Regulation PDFs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            max-width: 500px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+        }
+        select, input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            margin-top: 20px;
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .history-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Regulation Analyzer</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <label for="regulation">Select Regulation:</label>
+        <select name="regulation" id="regulation" required>
+            {% for reg in regulations %}
+                <option value="{{ reg.id }}">{{ reg.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="old_pdf">Upload Old Regulation PDF:</label>
+        <input type="file" name="old_pdf" id="old_pdf" accept="application/pdf" required>
+
+        <label for="new_pdf">Upload New Regulation PDF:</label>
+        <input type="file" name="new_pdf" id="new_pdf" accept="application/pdf" required>
+
+        <button type="submit">Process and Compare</button>
+    </form>
+
+    <a class="history-link" href="/history">View Upload History</a>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!-- templates/compare.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Regulation Graph Comparison</title>
+  <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+  <link href="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; }
+    h1 { text-align: center; background: #eee; padding: 10px; }
+    .container { display: flex; padding: 10px; justify-content: space-between; }
+    .graph-box { width: 48%; border: 1px solid #ccc; border-radius: 6px; padding: 10px; }
+    #oldGraph, #newGraph { height: 400px; }
+    .buttons { text-align: center; margin-top: 20px; }
+    .buttons button { margin: 0 10px; padding: 10px 20px; }
+    table { width: 96%; margin: 20px auto; border-collapse: collapse; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background-color: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <h1>Regulatory Graph Comparison</h1>
+  <div class="container">
+    <div class="graph-box">
+      <h3>Old Regulation Graph</h3>
+      <div id="oldGraph"></div>
+    </div>
+    <div class="graph-box">
+      <h3>New Regulation Graph</h3>
+      <div id="newGraph"></div>
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button onclick="location.href='/regenerate/{{ upload_id }}'">Regenerate</button>
+    <button onclick="location.href='/approve/{{ upload_id }}'">Approve (Generate KOP)</button>
+    <button onclick="location.href='/'">Go to Home</button>
+  </div>
+
+  <h3 style="text-align:center;">Graph Differences</h3>
+  <table>
+    <thead><tr><th>Type</th><th>Added</th><th>Removed</th></tr></thead>
+    <tbody id="diffBody"></tbody>
+  </table>
+
+  <script>
+    const uploadId = {{ upload_id }};
+    async function loadGraphs() {
+      const [oldRes, newRes] = await Promise.all([
+        fetch(`/graph_data/${uploadId}/old`).then(r => r.json()),
+        fetch(`/graph_data/${uploadId}/new`).then(r => r.json())
+      ]);
+
+      const oldMap = new Map(oldRes.nodes.map(n => [n.id, n]));
+      const newMap = new Map(newRes.nodes.map(n => [n.id, n]));
+      const added = [...newMap.keys()].filter(k => !oldMap.has(k));
+      const removed = [...oldMap.keys()].filter(k => !newMap.has(k));
+      const diffTable = document.getElementById(\"diffBody\");
+      diffTable.innerHTML += `<tr><td>Nodes</td><td>${added.join(', ')}</td><td>${removed.join(', ')}</td></tr>`;
+
+      const edgesAdded = newRes.edges.filter(e => !oldRes.edges.find(oe => oe.from === e.from && oe.to === e.to));
+      const edgesRemoved = oldRes.edges.filter(e => !newRes.edges.find(ne => ne.from === e.from && ne.to === e.to));
+      diffTable.innerHTML += `<tr><td>Edges</td><td>${edgesAdded.length}</td><td>${edgesRemoved.length}</td></tr>`;
+
+      const render = (id, nodes, edges) => {
+        const container = document.getElementById(id);
+        new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, {
+          layout: { improvedLayout: true },
+          interaction: { hover: true },
+          physics: { enabled: true },
+          edges: { arrows: \"to\" }
+        });
+      };
+
+      render(\"oldGraph\", oldRes.nodes, oldRes.edges);
+      render(\"newGraph\", newRes.nodes, newRes.edges);
+    }
+
+    loadGraphs();
+  </script>
+</body>
+</html>
