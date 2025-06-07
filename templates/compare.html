@@ -5,116 +5,119 @@
   <title>Regulation Graph Comparison (Vis.js)</title>
   <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
   <link href="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet" />
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-    }
+	<style>
+	  body {
+		margin: 0;
+		font-family: Arial, sans-serif;
+	  }
 
-    h1 {
-      text-align: center;
-      padding: 10px;
-      background-color: #f0f0f0;
-    }
+	  h1 {
+		text-align: center;
+		padding: 10px;
+		background-color: #f0f0f0;
+	  }
 
-    .container {
-      display: flex;
-      justify-content: space-around;
-      height: 70vh;
-      padding: 10px;
-    }
+	  .container {
+		display: flex;
+		justify-content: space-around;
+		height: 70vh;
+		padding: 10px;
+	  }
 
-    .graph-box {
-      width: 48%;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      height: 100%;
-      position: relative;
-    }
+	  .graph-box {
+		width: 48%;
+		border: 1px solid #ccc;
+		border-radius: 6px;
+		height: 100%;
+		position: relative;
+	  }
 
-    .graph-header {
-      text-align: center;
-      padding: 5px;
-      font-weight: bold;
-      background-color: #f8f8f8;
-      border-bottom: 1px solid #ccc;
-    }
+	  .graph-header {
+		text-align: center;
+		padding: 5px;
+		font-weight: bold;
+		background-color: #f8f8f8;
+		border-bottom: 1px solid #ccc;
+	  }
 
-    #oldGraph, #newGraph {
-      height: calc(100% - 30px);
-    }
+	  #oldGraph, #newGraph {
+		height: calc(100% - 30px);
+	  }
 
-    .tooltip {
-      position: absolute;
-      visibility: hidden;
-      padding: 6px;
-      background: #f9f9f9;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 12px;
-      z-index: 1000;
-      pointer-events: none;
-      white-space: pre-line;
-    }
+	  .tooltip {
+		position: absolute;
+		visibility: hidden;
+		padding: 6px;
+		background: #f9f9f9;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		font-size: 12px;
+		z-index: 1000;
+		pointer-events: none;
+		white-space: pre-line;
+	  }
 
-    .button-container {
-      text-align: center;
-      margin: 20px;
-    }
+	  .button-container {
+		text-align: center;
+		margin: 20px;
+	  }
 
-    .download-btn {
-      margin: 5px;
-      padding: 10px 16px;
-      font-size: 14px;
-      background-color: #007BFF;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
+	  .download-btn {
+		margin: 5px;
+		padding: 10px 16px;
+		font-size: 14px;
+		background-color: #007BFF;
+		color: white;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+	  }
 
-    .download-btn:hover {
-      background-color: #0056b3;
-    }
+	  .download-btn:hover {
+		background-color: #0056b3;
+	  }
 
-    .diff-table-container {
-      max-width: 96%;
-      margin: 20px auto;
-      overflow-x: auto;
-    }
+	  .diff-table-container {
+		width: 96%;
+		margin: 20px auto;
+	  }
 
-    #diffTable {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: auto;
-    }
+	  #diffTable {
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+	  }
 
-    #diffTable th, #diffTable td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      vertical-align: top;
-      text-align: left;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
+	  #diffTable th, #diffTable td {
+		border: 1px solid #ccc;
+		padding: 10px;
+		text-align: left;
+		vertical-align: top;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+	  }
 
-    #diffTable th {
-      background-color: #eee;
-    }
+	  #diffTable th {
+		background-color: #eee;
+	  }
 
-    #diffTable th:nth-child(1), #diffTable td:nth-child(1) {
-      width: 8%;
-    }
+	  #diffTable th:nth-child(1),
+	  #diffTable td:nth-child(1) {
+		width: 10%;
+	  }
 
-    #diffTable th:nth-child(2), #diffTable td:nth-child(2) {
-      width: 20%;
-    }
+	  #diffTable th:nth-child(2),
+	  #diffTable td:nth-child(2) {
+		width: 25%;
+	  }
 
-    #diffTable th:nth-child(3), #diffTable td:nth-child(3),
-    #diffTable th:nth-child(4), #diffTable td:nth-child(4) {
-      width: 36%;
-    }
-  </style>
+	  #diffTable th:nth-child(3),
+	  #diffTable td:nth-child(3),
+	  #diffTable th:nth-child(4),
+	  #diffTable td:nth-child(4) {
+		width: 32.5%;
+	  }
+	</style>
 </head>
 <body>
   <h1>Regulatory Graph Comparison</h1>
