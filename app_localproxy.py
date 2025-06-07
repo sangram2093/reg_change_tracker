@@ -25,28 +25,23 @@ def index():
         if not (os.path.exists(old_path) and os.path.exists(new_path)):
             return "One or both PDF paths are invalid.", 400
 
-        # Insert upload
         upload = Upload(regulation_id=regulation_id, old_path=old_path, new_path=new_path)
         db.session.add(upload)
         db.session.commit()
 
-        # Extract text
         old_text = extract_text_from_pdf(old_path)
         new_text = extract_text_from_pdf(new_path)
 
-        # Summarize
         old_summary = get_summary_with_context(old_text)
         new_summary = get_summary_with_context(new_text, context=old_summary)
         db.session.add(Summary(upload_id=upload.id, old_summary=old_summary, new_summary=new_summary))
         db.session.commit()
 
-        # Entity JSONs
         old_json = get_entity_relationship_with_context(old_summary)
         new_json = get_entity_relationship_with_context(new_summary, context=old_json)
         G_old = parse_graph_data(json.loads(old_json))
         G_new = parse_graph_data(json.loads(new_json))
 
-        # Serialize graph
         graph_old_json = json.dumps({
             "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
             "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
@@ -79,6 +74,62 @@ def graph_data(upload_id, version):
         return jsonify({"nodes": [], "edges": []})
     graph_json = graph_entry.graph_old if version == "old" else graph_entry.graph_new
     return jsonify(json.loads(graph_json))
+
+@app.route("/regenerate/<int:upload_id>", methods=["POST"])
+def regenerate(upload_id):
+    upload = Upload.query.get(upload_id)
+    Summary.query.filter_by(upload_id=upload_id).delete()
+    EntityGraph.query.filter_by(upload_id=upload_id).delete()
+    db.session.commit()
+
+    old_text = extract_text_from_pdf(upload.old_path)
+    new_text = extract_text_from_pdf(upload.new_path)
+
+    old_summary = get_summary_with_context(old_text)
+    new_summary = get_summary_with_context(new_text, context=old_summary)
+    db.session.add(Summary(upload_id=upload_id, old_summary=old_summary, new_summary=new_summary))
+    db.session.commit()
+
+    old_json = get_entity_relationship_with_context(old_summary)
+    new_json = get_entity_relationship_with_context(new_summary, context=old_json)
+    G_old = parse_graph_data(json.loads(old_json))
+    G_new = parse_graph_data(json.loads(new_json))
+
+    graph_old_json = json.dumps({
+        "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
+        "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
+    })
+    graph_new_json = json.dumps({
+        "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
+        "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
+    })
+
+    db.session.add(EntityGraph(
+        upload_id=upload_id,
+        old_json=old_json,
+        new_json=new_json,
+        graph_old=graph_old_json,
+        graph_new=graph_new_json
+    ))
+    db.session.commit()
+    return jsonify({"status": "regenerated"})
+
+@app.route("/approve/<int:upload_id>", methods=["POST"])
+def approve(upload_id):
+    from fpdf import FPDF
+    summary = Summary.query.filter_by(upload_id=upload_id).first()
+    upload = Upload.query.get(upload_id)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, f"Regulation: {upload.regulation.name}\nDate: {datetime.now().strftime('%Y-%m-%d')}\n")
+    pdf.multi_cell(0, 10, "\n--- Old Regulation Summary ---\n")
+    pdf.multi_cell(0, 10, summary.old_summary)
+    pdf.multi_cell(0, 10, "\n--- New Regulation Summary ---\n")
+    pdf.multi_cell(0, 10, summary.new_summary)
+    pdf_path = f"kop_upload_{upload_id}.pdf"
+    pdf.output(pdf_path)
+    return send_file(pdf_path, as_attachment=True)
 
 if __name__ == "__main__":
     with app.app_context():
