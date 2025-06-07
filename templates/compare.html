@@ -80,6 +80,15 @@
       text-align: center;
       margin-top: 20px;
     }
+    pre.pretty {
+      font-family: Consolas, monospace;
+      white-space: pre-wrap;
+      background: #f8f8f8;
+      padding: 8px;
+      border-radius: 4px;
+      max-width: 100%;
+      overflow-x: auto;
+    }
   </style>
 </head>
 <body>
@@ -206,8 +215,24 @@
     function addDiffRow(type, id, oldVal, newVal) {
       const tbody = document.querySelector("#diffTable tbody");
       const row = document.createElement("tr");
-      row.innerHTML = `<td>${type}</td><td>${id}</td><td>${oldVal || "-"}</td><td>${newVal || "-"}</td>`;
+
+      const prettyOld = document.createElement("td");
+      const prettyNew = document.createElement("td");
+      prettyOld.innerHTML = `<pre class="pretty">${formatPretty(oldVal)}</pre>`;
+      prettyNew.innerHTML = `<pre class="pretty">${formatPretty(newVal)}</pre>`;
+
+      row.innerHTML = `<td>${type}</td><td>${id}</td>`;
+      row.appendChild(prettyOld);
+      row.appendChild(prettyNew);
       tbody.appendChild(row);
+    }
+
+    function formatPretty(value) {
+      try {
+        return JSON.stringify(JSON.parse(value), null, 2);
+      } catch (e) {
+        return value || "-";
+      }
     }
 
     function downloadGraph(containerId) {
@@ -260,7 +285,7 @@
       for (const [id, newNode] of newNodeMap.entries()) {
         const oldNode = oldNodeMap.get(id);
         if (!oldNode || oldNode.label !== newNode.label || oldNode.group !== newNode.group) {
-          addDiffRow("Node", id, oldNode ? JSON.stringify(oldNode) : null, JSON.stringify(newNode));
+          addDiffRow("Node", id, JSON.stringify(oldNode), JSON.stringify(newNode));
         }
       }
 
@@ -271,7 +296,7 @@
         const oldEdge = oldEdgesMap.get(key);
         if (!oldEdge || oldEdge.label !== edge.label || oldEdge.title !== edge.title) {
           changedEdges.push(key);
-          addDiffRow("Edge", key, oldEdge ? JSON.stringify(oldEdge) : null, JSON.stringify(edge));
+          addDiffRow("Edge", key, JSON.stringify(oldEdge), JSON.stringify(edge));
         }
       }
 
