@@ -1,7 +1,8 @@
 import fitz  # PyMuPDF
 import json
 import networkx as nx
-from fpdf import FPDF
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 def extract_text_from_pdf(path):
     """Extracts text from a PDF file."""
@@ -28,7 +29,7 @@ def parse_graph_data(relationship_json):
             f"Condition: {rel.get('Condition for Relationship to be Active', '')}",
             f"Property: {rel.get('Property of Object (part of condition)', '')}",
             f"Thresholds: {rel.get('Thresholds', '')}",
-            f"Frequency: {rel.get('frequence', '')}"
+            f"Frequency: {rel.get('frequency', '')}"
         ]
         tooltip_text = "\n".join(tooltip_lines)
 
@@ -58,39 +59,38 @@ def compare_graphs(G_old, G_new):
 
     return changed_edges, added_nodes, removed_nodes
 
-class PDF(FPDF):
-    def __init__(self):
-        super().__init__()
-        self.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)  # Ensure DejaVuSans.ttf is in your project folder
-        self.set_font("DejaVu", "", 12)
+def generate_kop(old_summary, new_summary, old_json_str, new_json_str, output_path):
+    packet = BytesIO()
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
 
-    def header(self):
-        self.set_font("DejaVu", "", 12)
-        self.cell(0, 10, "Knowledge of Process (KOP) Document", ln=True, align="C")
+    def draw_section(title, content, start_y):
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(40, start_y, title)
+        c.setFont("Helvetica", 10)
+        lines = content.split("\n")
+        y = start_y - 15
+        for line in lines:
+            for wrapped in split_line(line, 100):
+                if y < 40:
+                    c.showPage()
+                    y = height - 40
+                    c.setFont("Helvetica", 10)
+                c.drawString(40, y, wrapped)
+                y -= 14
+        return y - 20
 
-    def footer(self):
-        self.set_y(-15)
-        self.set_font("DejaVu", "", 8)
-        self.cell(0, 10, f"Page {self.page_no()}", align="C")
+    def split_line(line, max_chars=100):
+        return [line[i:i+max_chars] for i in range(0, len(line), max_chars)]
 
-def generate_kop(summary_old, summary_new, entity_json_old, entity_json_new, output_path="KOP_Document.pdf"):
-    pdf = PDF()
-    pdf.add_page()
+    y = height - 40
+    y = draw_section("Old Regulation Summary", old_summary, y)
+    y = draw_section("New Regulation Summary", new_summary, y)
 
-    pdf.multi_cell(0, 10, "=== Old Summary ===")
-    pdf.multi_cell(0, 10, summary_old)
-    pdf.ln(10)
+    old_json = json.loads(old_json_str)
+    new_json = json.loads(new_json_str)
 
-    pdf.multi_cell(0, 10, "=== New Summary ===")
-    pdf.multi_cell(0, 10, summary_new)
-    pdf.ln(10)
+    y = draw_section("Old Entity Relationships", json.dumps(old_json, indent=2), y)
+    y = draw_section("New Entity Relationships", json.dumps(new_json, indent=2), y)
 
-    pdf.multi_cell(0, 10, "=== Old Entity Relationship ===")
-    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_old), indent=2, ensure_ascii=False))
-    pdf.ln(10)
-
-    pdf.multi_cell(0, 10, "=== New Entity Relationship ===")
-    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_new), indent=2, ensure_ascii=False))
-
-    pdf.output(output_path)
-    return output_path
+    c.save()
