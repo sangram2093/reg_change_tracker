@@ -25,49 +25,55 @@ def index():
         if not (os.path.exists(old_path) and os.path.exists(new_path)):
             return "One or both PDF paths are invalid.", 400
 
-        # Insert upload
         upload = Upload(regulation_id=regulation_id, old_path=old_path, new_path=new_path)
         db.session.add(upload)
         db.session.commit()
 
-        # Extract text
-        old_text = extract_text_from_pdf(old_path)
-        new_text = extract_text_from_pdf(new_path)
-
-        # Summarize
-        old_summary = get_summary_with_context(old_text)
-        new_summary = get_summary_with_context(new_text, context=old_summary)
-        db.session.add(Summary(upload_id=upload.id, old_summary=old_summary, new_summary=new_summary))
-        db.session.commit()
-
-        # Entity JSONs
-        old_json = get_entity_relationship_with_context(old_summary)
-        new_json = get_entity_relationship_with_context(new_summary, context=old_json)
-        G_old = parse_graph_data(json.loads(old_json))
-        G_new = parse_graph_data(json.loads(new_json))
-
-        # Serialize graphs
-        graph_old_json = json.dumps({
-            "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
-            "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
-        }, ensure_ascii=False)
-
-        graph_new_json = json.dumps({
-            "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
-            "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
-        }, ensure_ascii=False)
-
-        db.session.add(EntityGraph(
-            upload_id=upload.id,
-            old_json=old_json,
-            new_json=new_json,
-            graph_old=graph_old_json,
-            graph_new=graph_new_json
-        ))
-        db.session.commit()
-
+        process_upload(upload.id)
         return redirect(url_for("compare", upload_id=upload.id))
+
     return render_template("index.html", regulations=regulations)
+
+def process_upload(upload_id):
+    upload = Upload.query.get(upload_id)
+
+    # Extract text
+    old_text = extract_text_from_pdf(upload.old_path)
+    new_text = extract_text_from_pdf(upload.new_path)
+
+    # Summarize
+    old_summary = get_summary_with_context(old_text)
+    new_summary = get_summary_with_context(new_text, context=old_summary)
+    db.session.query(Summary).filter_by(upload_id=upload.id).delete()
+    db.session.add(Summary(upload_id=upload.id, old_summary=old_summary, new_summary=new_summary))
+    db.session.commit()
+
+    # Entity JSONs
+    old_json = get_entity_relationship_with_context(old_summary)
+    new_json = get_entity_relationship_with_context(new_summary, context=old_json)
+
+    G_old = parse_graph_data(json.loads(old_json))
+    G_new = parse_graph_data(json.loads(new_json))
+
+    graph_old_json = json.dumps({
+        "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
+        "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
+    })
+
+    graph_new_json = json.dumps({
+        "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
+        "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
+    })
+
+    db.session.query(EntityGraph).filter_by(upload_id=upload.id).delete()
+    db.session.add(EntityGraph(
+        upload_id=upload.id,
+        old_json=old_json,
+        new_json=new_json,
+        graph_old=graph_old_json,
+        graph_new=graph_new_json
+    ))
+    db.session.commit()
 
 @app.route("/compare/<int:upload_id>")
 def compare(upload_id):
@@ -81,26 +87,25 @@ def graph_data(upload_id, version):
     graph_json = graph_entry.graph_old if version == "old" else graph_entry.graph_new
     return jsonify(json.loads(graph_json))
 
+@app.route("/regenerate/<int:upload_id>", methods=["POST"])
+def regenerate(upload_id):
+    process_upload(upload_id)
+    return redirect(url_for("compare", upload_id=upload_id))
+
 @app.route("/approve/<int:upload_id>")
 def approve(upload_id):
-    upload = Upload.query.get(upload_id)
     summary = Summary.query.filter_by(upload_id=upload_id).first()
     graph = EntityGraph.query.filter_by(upload_id=upload_id).first()
+    if not (summary and graph):
+        return "Missing data for approval.", 400
 
-    if not (upload and summary and graph):
-        return "Upload data not found", 404
-
-    pdf_path = generate_kop(
-        summary_old=summary.old_summary,
-        summary_new=summary.new_summary,
-        entity_json_old=graph.old_json,
-        entity_json_new=graph.new_json
-    )
-    return send_file(pdf_path, as_attachment=True)
+    output_pdf = f"KOP_Upload_{upload_id}.pdf"
+    generate_kop(summary.old_summary, summary.new_summary, graph.old_json, graph.new_json, output_path=output_pdf)
+    return send_file(output_pdf, as_attachment=True)
 
 @app.route("/history")
 def history():
-    uploads = Upload.query.order_by(Upload.id.desc()).all()
+    uploads = Upload.query.order_by(Upload.created_at.desc()).all()
     return render_template("history.html", uploads=uploads)
 
 if __name__ == "__main__":
