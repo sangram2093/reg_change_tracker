@@ -97,7 +97,7 @@
 
   <div class="button-container">
     <button class="download-btn" onclick="regenerateGraphs()">🔄 Regenerate</button>
-    <button class="download-btn" onclick="approveKOP()">✅ Approve & Download KOP</button>
+    <button class="download-btn" onclick="approveKOP()">✅ Approve & Download KOP (Word)</button>
     <button class="download-btn" onclick="goHome()">🏠 Go to Home</button>
     <button class="download-btn" onclick="downloadGraph('newGraph')">📥 Download New Graph as PNG</button>
   </div>
@@ -239,7 +239,7 @@
           const url = window.URL.createObjectURL(blob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = `kop_upload_${uploadId}.pdf`;
+          link.download = `kop_upload_${uploadId}.docx`;
           link.click();
         })
         .catch(() => alert("Error generating KOP document."));
