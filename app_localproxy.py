@@ -92,7 +92,7 @@ def regenerate(upload_id):
     process_upload(upload_id)
     return redirect(url_for("compare", upload_id=upload_id))
 
-@app.route("/approve/<int:upload_id>")
+@app.route("/approve/<int:upload_id>", methods=["POST"])
 def approve(upload_id):
     summary = Summary.query.filter_by(upload_id=upload_id).first()
     graph = EntityGraph.query.filter_by(upload_id=upload_id).first()
