@@ -3,132 +3,112 @@
 <head>
   <meta charset="UTF-8">
   <title>Regulation Graph Comparison (Vis.js)</title>
-  <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+  <script type="text/javascript" src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
   <link href="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet" />
-	<style>
-	  body {
-		margin: 0;
-		font-family: Arial, sans-serif;
-	  }
-
-	  h1 {
-		text-align: center;
-		padding: 10px;
-		background-color: #f0f0f0;
-	  }
-
-	  .container {
-		display: flex;
-		justify-content: space-around;
-		height: 70vh;
-		padding: 10px;
-	  }
-
-	  .graph-box {
-		width: 48%;
-		border: 1px solid #ccc;
-		border-radius: 6px;
-		height: 100%;
-		position: relative;
-	  }
-
-	  .graph-header {
-		text-align: center;
-		padding: 5px;
-		font-weight: bold;
-		background-color: #f8f8f8;
-		border-bottom: 1px solid #ccc;
-	  }
-
-	  #oldGraph, #newGraph {
-		height: calc(100% - 30px);
-	  }
-
-	  .tooltip {
-		position: absolute;
-		visibility: hidden;
-		padding: 6px;
-		background: #f9f9f9;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		font-size: 12px;
-		z-index: 1000;
-		pointer-events: none;
-		white-space: pre-line;
-	  }
-
-	  .button-container {
-		text-align: center;
-		margin: 20px;
-	  }
-
-	  .download-btn {
-		margin: 5px;
-		padding: 10px 16px;
-		font-size: 14px;
-		background-color: #007BFF;
-		color: white;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-	  }
-
-	  .download-btn:hover {
-		background-color: #0056b3;
-	  }
-
-	  .diff-table-container {
-		width: 96%;
-		margin: 20px auto;
-	  }
-
-	  #diffTable {
-		width: 100%;
-		border-collapse: collapse;
-		table-layout: fixed;
-	  }
-
-	  #diffTable th, #diffTable td {
-		border: 1px solid #ccc;
-		padding: 10px;
-		vertical-align: top;
-		word-break: break-word;
-		white-space: pre-wrap;
-	  }
-
-	  #diffTable th {
-		background-color: #eee;
-	  }
-
-	  /* Specific widths for each column */
-	  #diffTable th:nth-child(1),
-	  #diffTable td:nth-child(1) {
-		width: 10%;
-		white-space: nowrap;
-	  }
-
-	  #diffTable th:nth-child(2),
-	  #diffTable td:nth-child(2) {
-		width: 20%;
-		white-space: nowrap;
-	  }
-
-	  #diffTable th:nth-child(3),
-	  #diffTable td:nth-child(3),
-	  #diffTable th:nth-child(4),
-	  #diffTable td:nth-child(4) {
-		width: 35%;
-		word-wrap: break-word;
-		word-break: break-word;
-		white-space: pre-wrap;
-		overflow-wrap: break-word;
-	  }
-	  }
-	</style>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    h1 {
+      text-align: center;
+      padding: 10px;
+      background-color: #f0f0f0;
+    }
+    .container {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-around;
+      height: 70vh;
+      padding: 10px;
+    }
+    .graph-box {
+      width: 48%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      height: 100%;
+      position: relative;
+    }
+    .graph-header {
+      text-align: center;
+      padding: 5px;
+      font-weight: bold;
+      background-color: #f8f8f8;
+      border-bottom: 1px solid #ccc;
+    }
+    #oldGraph, #newGraph {
+      height: calc(100% - 30px);
+    }
+    .tooltip {
+      position: absolute;
+      visibility: hidden;
+      padding: 6px;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 1000;
+      pointer-events: none;
+      white-space: pre-line;
+    }
+    .button-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .download-btn {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 14px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .download-btn:hover {
+      background-color: #0056b3;
+    }
+    #diffTable {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin: 20px auto;
+    }
+    #diffTable th, #diffTable td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    #diffTable th:nth-child(1),
+    #diffTable td:nth-child(1) {
+      width: 10%;
+      min-width: 80px;
+    }
+    #diffTable th:nth-child(2),
+    #diffTable td:nth-child(2) {
+      width: 20%;
+      min-width: 120px;
+    }
+    #diffTable th:nth-child(3),
+    #diffTable td:nth-child(3),
+    #diffTable th:nth-child(4),
+    #diffTable td:nth-child(4) {
+      width: 35%;
+      min-width: 200px;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    #diffTable td div {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
 </head>
 <body>
   <h1>Regulatory Graph Comparison</h1>
-
   <div class="container">
     <div class="graph-box">
       <div class="graph-header">Old Regulation Graph</div>
@@ -147,19 +127,17 @@
     <button class="download-btn" onclick="downloadGraph('newGraph')">📥 Download New Graph as PNG</button>
   </div>
 
-  <div class="diff-table-container">
-    <table id="diffTable">
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Entity</th>
-          <th>Old</th>
-          <th>New</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+  <table id="diffTable">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>ID</th>
+        <th>Old</th>
+        <th>New</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
   <div id="tooltip" class="tooltip"></div>
 
@@ -170,46 +148,10 @@
       return `${edge.from}->${edge.to}`;
     }
 
-    function formatAttributes(obj) {
-      return Object.entries(obj || {})
-        .map(([k, v]) => `${k}: ${v}`)
-        .join("\n");
-    }
-
-    function getEntityName(id, nodesMap) {
-      return nodesMap.has(id) ? nodesMap.get(id).label : id;
-    }
-
-    function downloadGraph(containerId) {
-      const container = document.getElementById(containerId);
-      html2canvas(container).then(canvas => {
-        const link = document.createElement("a");
-        link.download = `${containerId}_graph.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-      });
-    }
-
-    function regenerateGraphs() {
-      fetch(`/regenerate/${uploadId}`, { method: 'POST' })
-        .then(resp => resp.ok ? location.reload() : alert("Failed to regenerate graphs."));
-    }
-
-    function approveKOP() {
-      fetch(`/approve/${uploadId}`, { method: 'POST' })
-        .then(resp => resp.blob())
-        .then(blob => {
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `kop_upload_${uploadId}.docx`;
-          link.click();
-        })
-        .catch(() => alert("Error generating KOP document."));
-    }
-
-    function goHome() {
-      window.location.href = "/";
+    function nodeLabelMap(nodes) {
+      const map = {};
+      nodes.forEach(n => map[n.id] = n.label);
+      return map;
     }
 
     async function renderGraph(containerId, data, fixedPositions = null, highlightEdges = []) {
@@ -292,15 +234,59 @@
       };
     }
 
+    function formatObject(obj) {
+      if (!obj || typeof obj !== 'object') return obj || '-';
+      return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join('\n');
+    }
+
     function addDiffRow(type, id, oldVal, newVal) {
       const tbody = document.querySelector("#diffTable tbody");
       const row = document.createElement("tr");
       row.innerHTML = `
         <td>${type}</td>
         <td>${id}</td>
-        <td><pre>${oldVal || "-"}</pre></td>
-        <td><pre>${newVal || "-"}</pre></td>`;
+        <td><div>${formatObject(oldVal)}</div></td>
+        <td><div>${formatObject(newVal)}</div></td>`;
       tbody.appendChild(row);
+    }
+
+    function downloadGraph(containerId) {
+      const container = document.getElementById(containerId);
+      html2canvas(container).then(canvas => {
+        const link = document.createElement("a");
+        link.download = `${containerId}_graph.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+      });
+    }
+
+    function regenerateGraphs() {
+      fetch(`/regenerate/${uploadId}`, { method: 'POST' })
+        .then(resp => {
+          if (resp.ok) {
+            alert("Graphs regenerated successfully.");
+            location.reload();
+          } else {
+            alert("Failed to regenerate graphs.");
+          }
+        });
+    }
+
+    function approveKOP() {
+      fetch(`/approve/${uploadId}`, { method: 'POST' })
+        .then(resp => resp.blob())
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `kop_upload_${uploadId}.docx`;
+          link.click();
+        })
+        .catch(() => alert("Error generating KOP document."));
+    }
+
+    function goHome() {
+      window.location.href = "/";
     }
 
     async function renderBothGraphs() {
@@ -309,30 +295,27 @@
         fetch(`/graph_data/${uploadId}/new`).then(r => r.json())
       ]);
 
-      const oldNodeMap = new Map(oldRes.nodes.map(n => [n.id, n]));
-      const newNodeMap = new Map(newRes.nodes.map(n => [n.id, n]));
+      const oldNodeMap = nodeLabelMap(oldRes.nodes);
+      const newNodeMap = nodeLabelMap(newRes.nodes);
 
-      for (const [id, newNode] of newNodeMap.entries()) {
-        const oldNode = oldNodeMap.get(id);
+      for (const [id, newNode] of Object.entries(newNodeMap)) {
+        const oldNode = oldRes.nodes.find(n => n.id === id);
         if (!oldNode || oldNode.label !== newNode.label || oldNode.group !== newNode.group) {
-          addDiffRow("Node", newNode.label, formatAttributes(oldNode), formatAttributes(newNode));
+          addDiffRow("Node", newNode.label, oldNode, newNode);
         }
       }
 
       const oldEdgesMap = new Map(oldRes.edges.map(e => [edgeKey(e), e]));
       const changedEdges = [];
-
       for (const edge of newRes.edges) {
         const key = edgeKey(edge);
         const oldEdge = oldEdgesMap.get(key);
+        const fromName = newNodeMap[edge.from] || edge.from;
+        const toName = newNodeMap[edge.to] || edge.to;
+        const displayId = `${fromName} → ${toName}`;
         if (!oldEdge || oldEdge.label !== edge.label || oldEdge.title !== edge.title) {
           changedEdges.push(key);
-
-          const fromLabel = getEntityName(edge.from, newNodeMap);
-          const toLabel = getEntityName(edge.to, newNodeMap);
-          const readableId = `${fromLabel} → ${toLabel}`;
-
-          addDiffRow("Edge", readableId, formatAttributes(oldEdge), formatAttributes(edge));
+          addDiffRow("Edge", displayId, oldEdge, edge);
         }
       }
 
