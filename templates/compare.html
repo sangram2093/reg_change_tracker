@@ -64,10 +64,21 @@
       background-color: #eee;
     }
     .download-btn {
-      margin: 10px auto;
-      display: block;
-      padding: 8px 16px;
+      margin: 10px;
+      padding: 10px 20px;
       font-size: 14px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .download-btn:hover {
+      background-color: #0056b3;
+    }
+    .button-container {
+      text-align: center;
+      margin-top: 20px;
     }
   </style>
 </head>
@@ -84,7 +95,12 @@
     </div>
   </div>
 
-  <button class="download-btn" onclick="downloadGraph('newGraph')">Download New Graph as PNG</button>
+  <div class="button-container">
+    <button class="download-btn" onclick="regenerateGraphs()">🔄 Regenerate</button>
+    <button class="download-btn" onclick="approveKOP()">✅ Approve & Download KOP</button>
+    <button class="download-btn" onclick="goHome()">🏠 Go to Home</button>
+    <button class="download-btn" onclick="downloadGraph('newGraph')">📥 Download New Graph as PNG</button>
+  </div>
 
   <table id="diffTable">
     <thead>
@@ -204,13 +220,41 @@
       });
     }
 
+    function regenerateGraphs() {
+      fetch(`/regenerate/${uploadId}`, { method: 'POST' })
+        .then(resp => {
+          if (resp.ok) {
+            alert("Graphs regenerated successfully.");
+            location.reload();
+          } else {
+            alert("Failed to regenerate graphs.");
+          }
+        });
+    }
+
+    function approveKOP() {
+      fetch(`/approve/${uploadId}`, { method: 'POST' })
+        .then(resp => resp.blob())
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `kop_upload_${uploadId}.pdf`;
+          link.click();
+        })
+        .catch(() => alert("Error generating KOP document."));
+    }
+
+    function goHome() {
+      window.location.href = "/";
+    }
+
     async function renderBothGraphs() {
       const [oldRes, newRes] = await Promise.all([
         fetch(`/graph_data/${uploadId}/old`).then(r => r.json()),
         fetch(`/graph_data/${uploadId}/new`).then(r => r.json())
       ]);
 
-      // Compare nodes
       const oldNodeMap = new Map(oldRes.nodes.map(n => [n.id, n]));
       const newNodeMap = new Map(newRes.nodes.map(n => [n.id, n]));
       for (const [id, newNode] of newNodeMap.entries()) {
@@ -220,7 +264,6 @@
         }
       }
 
-      // Compare edges
       const oldEdgesMap = new Map(oldRes.edges.map(e => [edgeKey(e), e]));
       const changedEdges = [];
       for (const edge of newRes.edges) {
@@ -232,13 +275,11 @@
         }
       }
 
-      // Render graphs
       const { getPositions } = await renderGraph("oldGraph", oldRes);
       const fixedPositions = await getPositions();
       await renderGraph("newGraph", newRes, fixedPositions, changedEdges);
     }
 
-    // Load html2canvas for PNG export and then render graphs
     const script = document.createElement("script");
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
     script.onload = renderBothGraphs;
