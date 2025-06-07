@@ -85,39 +85,37 @@
 	  #diffTable {
 		width: 100%;
 		border-collapse: collapse;
-		table-layout: auto;
 	  }
 
-	  #diffTable th,
-	  #diffTable td {
+	  #diffTable th, #diffTable td {
 		border: 1px solid #ccc;
 		padding: 10px;
 		text-align: left;
 		vertical-align: top;
-		word-break: break-word;
-		white-space: pre-wrap;
 	  }
 
 	  #diffTable th {
 		background-color: #eee;
 	  }
 
-	  /* Optional: Better width distribution */
-	  #diffTable th:nth-child(1),
-	  #diffTable td:nth-child(1) {
-		width: 10%;
-	  }
-
-	  #diffTable th:nth-child(2),
-	  #diffTable td:nth-child(2) {
-		width: 20%;
-	  }
-
-	  #diffTable th:nth-child(3),
+	  /* Only wrap text in Old and New columns */
 	  #diffTable td:nth-child(3),
-	  #diffTable th:nth-child(4),
 	  #diffTable td:nth-child(4) {
-		width: 35%;
+		white-space: pre-wrap;
+		word-break: break-word;
+	  }
+
+	  /* Let Type and ID have natural width */
+	  #diffTable td:nth-child(1),
+	  #diffTable th:nth-child(1) {
+		width: 10%;
+		white-space: nowrap;
+	  }
+
+	  #diffTable td:nth-child(2),
+	  #diffTable th:nth-child(2) {
+		width: 20%;
+		white-space: nowrap;
 	  }
 	</style>
 </head>
