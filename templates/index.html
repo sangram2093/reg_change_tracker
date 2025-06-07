@@ -1,70 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Upload Regulation PDFs by Path</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background-color: #f8f9fa;
-        }
-        h1 {
-            text-align: center;
-        }
-        form {
-            max-width: 500px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        label {
-            display: block;
-            margin-top: 15px;
-        }
-        select, input[type="text"] {
-            width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-        }
-        button {
-            margin-top: 20px;
-            width: 100%;
-            padding: 10px;
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        .history-link {
-            display: block;
-            text-align: center;
-            margin-top: 20px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Regulation Comparison Upload</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f7f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .history-link {
+      text-align: center;
+      margin-top: 25px;
+    }
+
+    .history-link a {
+      text-decoration: none;
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .history-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
 <body>
-    <h1>Regulation Analyzer</h1>
+  <div class="container">
+    <h2>Upload Regulation PDFs</h2>
     <form method="POST">
-        <label for="regulation">Select Regulation:</label>
-        <select name="regulation" id="regulation" required>
-            {% for reg in regulations %}
-                <option value="{{ reg.id }}">{{ reg.name }}</option>
-            {% endfor %}
-        </select>
+      <label for="regulation">Select Regulation</label>
+      <select name="regulation" id="regulation" required>
+        {% for regulation in regulations %}
+          <option value="{{ regulation.id }}">{{ regulation.name }}</option>
+        {% endfor %}
+      </select>
 
-        <label for="old_path">Path to Old Regulation PDF:</label>
-        <input type="text" name="old_path" id="old_path" required>
+      <label for="old_path">Old Regulation PDF Path</label>
+      <input type="text" name="old_path" id="old_path" placeholder="/path/to/old.pdf" required>
 
-        <label for="new_path">Path to New Regulation PDF:</label>
-        <input type="text" name="new_path" id="new_path" required>
+      <label for="new_path">New Regulation PDF Path</label>
+      <input type="text" name="new_path" id="new_path" placeholder="/path/to/new.pdf" required>
 
-        <button type="submit">Process and Compare</button>
+      <button type="submit">Generate Graph</button>
     </form>
 
-    <a class="history-link" href="/history">View Upload History</a>
+    <div class="history-link">
+      <a href="/history">View Upload History</a>
+    </div>
+  </div>
 </body>
 </html>
