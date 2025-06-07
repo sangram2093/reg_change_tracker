@@ -11,11 +11,9 @@ import json
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://db_admin:pwd@127.0.0.1:5432/postgres'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = "uploaded_docs"
 
 db.init_app(app)
 
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs("kop_docs", exist_ok=True)
 
 init_vertexai()
@@ -25,14 +23,12 @@ def index():
     regulations = Regulation.query.all()
     if request.method == "POST":
         regulation_id = request.form['regulation']
-        old_file = request.files['old_pdf']
-        new_file = request.files['new_pdf']
-        old_filename = secure_filename(old_file.filename)
-        new_filename = secure_filename(new_file.filename)
-        old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_filename)
-        new_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
-        old_file.save(old_path)
-        new_file.save(new_path)
+        old_path = request.form['old_path'].strip()
+        new_path = request.form['new_path'].strip()
+
+        if not (os.path.exists(old_path) and os.path.exists(new_path)):
+            return "One or both of the PDF paths are invalid.", 400
+
         upload = Upload(regulation_id=regulation_id, old_path=old_path, new_path=new_path)
         db.session.add(upload)
         db.session.commit()
@@ -92,8 +88,6 @@ def history():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-
-        # Optional seed regulations
         if not Regulation.query.first():
             db.session.add_all([
                 Regulation(name="EMIR Refit"),
@@ -101,5 +95,4 @@ if __name__ == "__main__":
                 Regulation(name="SFTR")
             ])
             db.session.commit()
-
     app.run(debug=True)
