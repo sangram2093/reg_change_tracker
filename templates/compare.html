@@ -10,18 +10,20 @@
       margin: 0;
       font-family: Arial, sans-serif;
     }
+
     h1 {
       text-align: center;
       padding: 10px;
       background-color: #f0f0f0;
     }
+
     .container {
       display: flex;
-      flex-direction: row;
       justify-content: space-around;
       height: 70vh;
       padding: 10px;
     }
+
     .graph-box {
       width: 48%;
       border: 1px solid #ccc;
@@ -29,6 +31,7 @@
       height: 100%;
       position: relative;
     }
+
     .graph-header {
       text-align: center;
       padding: 5px;
@@ -36,9 +39,11 @@
       background-color: #f8f8f8;
       border-bottom: 1px solid #ccc;
     }
+
     #oldGraph, #newGraph {
       height: calc(100% - 30px);
     }
+
     .tooltip {
       position: absolute;
       visibility: hidden;
@@ -51,10 +56,33 @@
       pointer-events: none;
       white-space: pre-line;
     }
+
+    table#diffTable {
+      width: 95%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      table-layout: fixed;
+      word-wrap: break-word;
+    }
+
+    #diffTable th, #diffTable td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      vertical-align: top;
+      word-break: break-word;
+      white-space: pre-line;
+    }
+
+    #diffTable th {
+      background-color: #eee;
+      text-align: center;
+    }
+
     .button-container {
       text-align: center;
       margin-top: 20px;
     }
+
     .download-btn {
       margin: 10px;
       padding: 10px 20px;
@@ -65,269 +93,222 @@
       border-radius: 4px;
       cursor: pointer;
     }
+
     .download-btn:hover {
       background-color: #0056b3;
-    }
-    #diffTable {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin: 20px auto;
-    }
-    #diffTable th, #diffTable td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: left;
-      vertical-align: top;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
-    #diffTable th:nth-child(1),
-    #diffTable td:nth-child(1) {
-      width: 10%;
-      min-width: 80px;
-    }
-    #diffTable th:nth-child(2),
-    #diffTable td:nth-child(2) {
-      width: 20%;
-      min-width: 120px;
-    }
-    #diffTable th:nth-child(3),
-    #diffTable td:nth-child(3),
-    #diffTable th:nth-child(4),
-    #diffTable td:nth-child(4) {
-      width: 35%;
-      min-width: 200px;
-      overflow-wrap: break-word;
-      word-break: break-word;
-    }
-    #diffTable td div {
-      white-space: pre-wrap;
-      word-break: break-word;
     }
   </style>
 </head>
 <body>
-  <h1>Regulatory Graph Comparison</h1>
-  <div class="container">
-    <div class="graph-box">
-      <div class="graph-header">Old Regulation Graph</div>
-      <div id="oldGraph"></div>
-    </div>
-    <div class="graph-box">
-      <div class="graph-header">New Regulation Graph</div>
-      <div id="newGraph"></div>
-    </div>
+<h1>Regulatory Graph Comparison</h1>
+
+<div class="container">
+  <div class="graph-box">
+    <div class="graph-header">Old Regulation Graph</div>
+    <div id="oldGraph"></div>
   </div>
-
-  <div class="button-container">
-    <button class="download-btn" onclick="regenerateGraphs()">🔄 Regenerate</button>
-    <button class="download-btn" onclick="approveKOP()">✅ Approve & Download KOP (Word)</button>
-    <button class="download-btn" onclick="goHome()">🏠 Go to Home</button>
-    <button class="download-btn" onclick="downloadGraph('newGraph')">📥 Download New Graph as PNG</button>
+  <div class="graph-box">
+    <div class="graph-header">New Regulation Graph</div>
+    <div id="newGraph"></div>
   </div>
+</div>
 
-  <table id="diffTable">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>ID</th>
-        <th>Old</th>
-        <th>New</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<div class="button-container">
+  <button class="download-btn" onclick="regenerateGraphs()">🔄 Regenerate</button>
+  <button class="download-btn" onclick="approveKOP()">✅ Approve & Download KOP</button>
+  <button class="download-btn" onclick="goHome()">🏠 Go to Home</button>
+  <button class="download-btn" onclick="downloadGraph('newGraph')">📥 Download New Graph as PNG</button>
+</div>
 
-  <div id="tooltip" class="tooltip"></div>
+<table id="diffTable">
+  <thead>
+  <tr>
+    <th>Type</th>
+    <th>Edge (From → To)</th>
+    <th>Old</th>
+    <th>New</th>
+  </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-  <script>
-    const uploadId = {{ upload_id | safe }};
+<div id="tooltip" class="tooltip"></div>
 
-    function edgeKey(edge) {
-      return `${edge.from}->${edge.to}`;
-    }
+<script>
+  const uploadId = {{ upload_id | safe }};
 
-    function nodeLabelMap(nodes) {
-      const map = {};
-      nodes.forEach(n => map[n.id] = n.label);
-      return map;
-    }
+  function edgeKey(edge) {
+    return `${edge.from}->${edge.to}`;
+  }
 
-    async function renderGraph(containerId, data, fixedPositions = null, highlightEdges = []) {
-      const container = document.getElementById(containerId);
-      const tooltip = document.getElementById("tooltip");
+  function nodeLabelMap(nodes) {
+    const map = {};
+    nodes.forEach(n => map[n.id] = n.label || n.id);
+    return map;
+  }
 
-      const nodesDataSet = new vis.DataSet(data.nodes);
-      const edgesDataSet = new vis.DataSet(data.edges.map(edge => {
-        if (highlightEdges.includes(edgeKey(edge))) {
-          edge.color = { color: 'red' };
-          edge.font = { color: 'red', bold: true };
-        }
-        return edge;
-      }));
+  function formatProperties(obj) {
+    if (!obj) return "-";
+    return Object.entries(obj)
+      .filter(([k]) => !["from", "to"].includes(k))
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("\n");
+  }
 
-      if (fixedPositions) {
-        nodesDataSet.forEach(node => {
-          const pos = fixedPositions[node.id];
-          if (pos) {
-            node.x = pos.x;
-            node.y = pos.y;
-            node.fixed = { x: true, y: true };
-            nodesDataSet.update(node);
-          }
-        });
-      }
+  function addDiffRow(type, edgeLabel, oldProps, newProps) {
+    const tbody = document.querySelector("#diffTable tbody");
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${type}</td>
+      <td>${edgeLabel}</td>
+      <td>${formatProperties(oldProps)}</td>
+      <td>${formatProperties(newProps)}</td>
+    `;
+    tbody.appendChild(row);
+  }
 
-      const network = new vis.Network(container, {
-        nodes: nodesDataSet,
-        edges: edgesDataSet
-      }, {
-        layout: { improvedLayout: true },
-        interaction: { hover: true, tooltipDelay: 100 },
-        physics: {
-          enabled: !fixedPositions,
-          barnesHut: {
-            gravitationalConstant: -30000,
-            springLength: 100
-          }
-        },
-        nodes: {
-          shape: "dot",
-          size: 20,
-          font: { size: 14, color: "#000" }
-        },
-        edges: {
-          arrows: "to",
-          font: { align: "middle", size: 12, color: "#333" },
-          color: { color: "#848484", highlight: "#848484", hover: "#848484" },
-          smooth: { type: "dynamic" }
+  function downloadGraph(containerId) {
+    const container = document.getElementById(containerId);
+    html2canvas(container).then(canvas => {
+      const link = document.createElement("a");
+      link.download = `${containerId}_graph.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+  }
+
+  function regenerateGraphs() {
+    fetch(`/regenerate/${uploadId}`, { method: 'POST' })
+      .then(resp => {
+        if (resp.ok) {
+          alert("Graphs regenerated successfully.");
+          location.reload();
+        } else {
+          alert("Failed to regenerate graphs.");
         }
       });
+  }
 
-      network.on("hoverEdge", function (params) {
-        const edge = edgesDataSet.get(params.edge);
-        if (edge && edge.title) {
-          tooltip.innerText = edge.title;
-          tooltip.style.left = params.event.pageX + 10 + "px";
-          tooltip.style.top = params.event.pageY + 10 + "px";
-          tooltip.style.visibility = "visible";
-        }
-      });
-
-      network.on("blurEdge", function () {
-        tooltip.style.visibility = "hidden";
-      });
-
-      return {
-        network,
-        getPositions: () =>
-          new Promise(resolve => {
-            if (!fixedPositions) {
-              network.once("stabilized", () => {
-                resolve(network.getPositions());
-              });
-            } else {
-              resolve(null);
-            }
-          })
-      };
-    }
-
-    function formatObject(obj) {
-      if (!obj || typeof obj !== 'object') return obj || '-';
-      return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join('\n');
-    }
-
-    function addDiffRow(type, id, oldVal, newVal) {
-      const tbody = document.querySelector("#diffTable tbody");
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${type}</td>
-        <td>${id}</td>
-        <td><div>${formatObject(oldVal)}</div></td>
-        <td><div>${formatObject(newVal)}</div></td>`;
-      tbody.appendChild(row);
-    }
-
-    function downloadGraph(containerId) {
-      const container = document.getElementById(containerId);
-      html2canvas(container).then(canvas => {
+  function approveKOP() {
+    fetch(`/approve/${uploadId}`, { method: 'POST' })
+      .then(resp => resp.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.download = `${containerId}_graph.png`;
-        link.href = canvas.toDataURL();
+        link.href = url;
+        link.download = `kop_upload_${uploadId}.docx`;
         link.click();
+      })
+      .catch(() => alert("Error generating KOP document."));
+  }
+
+  function goHome() {
+    window.location.href = "/";
+  }
+
+  async function renderGraph(containerId, data, fixedPositions = null, highlightEdges = []) {
+    const container = document.getElementById(containerId);
+    const tooltip = document.getElementById("tooltip");
+
+    const nodesDataSet = new vis.DataSet(data.nodes);
+    const edgesDataSet = new vis.DataSet(data.edges.map(edge => {
+      if (highlightEdges.includes(edgeKey(edge))) {
+        edge.color = { color: 'red' };
+        edge.font = { color: 'red', bold: true };
+      }
+      return edge;
+    }));
+
+    if (fixedPositions) {
+      nodesDataSet.forEach(node => {
+        const pos = fixedPositions[node.id];
+        if (pos) {
+          node.x = pos.x;
+          node.y = pos.y;
+          node.fixed = { x: true, y: true };
+          nodesDataSet.update(node);
+        }
       });
     }
 
-    function regenerateGraphs() {
-      fetch(`/regenerate/${uploadId}`, { method: 'POST' })
-        .then(resp => {
-          if (resp.ok) {
-            alert("Graphs regenerated successfully.");
-            location.reload();
+    const network = new vis.Network(container, {
+      nodes: nodesDataSet,
+      edges: edgesDataSet
+    }, {
+      layout: { improvedLayout: true },
+      interaction: { hover: true, tooltipDelay: 100 },
+      physics: { enabled: !fixedPositions },
+      nodes: {
+        shape: "dot",
+        size: 20,
+        font: { size: 14, color: "#000" }
+      },
+      edges: {
+        arrows: "to",
+        font: { align: "middle", size: 12, color: "#333" },
+        color: { color: "#848484", highlight: "#848484", hover: "#848484" },
+        smooth: { type: "dynamic" }
+      }
+    });
+
+    network.on("hoverEdge", function (params) {
+      const edge = edgesDataSet.get(params.edge);
+      if (edge && edge.title) {
+        tooltip.innerText = edge.title;
+        tooltip.style.left = params.event.pageX + 10 + "px";
+        tooltip.style.top = params.event.pageY + 10 + "px";
+        tooltip.style.visibility = "visible";
+      }
+    });
+
+    network.on("blurEdge", function () {
+      tooltip.style.visibility = "hidden";
+    });
+
+    return {
+      network,
+      getPositions: () =>
+        new Promise(resolve => {
+          if (!fixedPositions) {
+            network.once("stabilized", () => resolve(network.getPositions()));
           } else {
-            alert("Failed to regenerate graphs.");
+            resolve(null);
           }
-        });
-    }
-
-    function approveKOP() {
-      fetch(`/approve/${uploadId}`, { method: 'POST' })
-        .then(resp => resp.blob())
-        .then(blob => {
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `kop_upload_${uploadId}.docx`;
-          link.click();
         })
-        .catch(() => alert("Error generating KOP document."));
-    }
+    };
+  }
 
-    function goHome() {
-      window.location.href = "/";
-    }
+  async function renderBothGraphs() {
+    const [oldRes, newRes] = await Promise.all([
+      fetch(`/graph_data/${uploadId}/old`).then(r => r.json()),
+      fetch(`/graph_data/${uploadId}/new`).then(r => r.json())
+    ]);
 
-    async function renderBothGraphs() {
-      const [oldRes, newRes] = await Promise.all([
-        fetch(`/graph_data/${uploadId}/old`).then(r => r.json()),
-        fetch(`/graph_data/${uploadId}/new`).then(r => r.json())
-      ]);
+    const oldNodeMap = nodeLabelMap(oldRes.nodes);
+    const newNodeMap = nodeLabelMap(newRes.nodes);
 
-      const oldNodeMap = nodeLabelMap(oldRes.nodes);
-      const newNodeMap = nodeLabelMap(newRes.nodes);
+    const oldEdgesMap = new Map(oldRes.edges.map(e => [edgeKey(e), e]));
+    const changedEdges = [];
 
-      for (const [id, newNode] of Object.entries(newNodeMap)) {
-        const oldNode = oldRes.nodes.find(n => n.id === id);
-        if (!oldNode || oldNode.label !== newNode.label || oldNode.group !== newNode.group) {
-          addDiffRow("Node", newNode.label, oldNode, newNode);
-        }
+    for (const edge of newRes.edges) {
+      const key = edgeKey(edge);
+      const oldEdge = oldEdgesMap.get(key);
+      const displayLabel = `${newNodeMap[edge.from]} → ${newNodeMap[edge.to]}`;
+      if (!oldEdge || oldEdge.label !== edge.label || oldEdge.title !== edge.title) {
+        changedEdges.push(key);
+        addDiffRow("Edge", displayLabel, oldEdge, edge);
       }
-
-      const oldEdgesMap = new Map(oldRes.edges.map(e => [edgeKey(e), e]));
-      const changedEdges = [];
-      for (const edge of newRes.edges) {
-        const key = edgeKey(edge);
-        const oldEdge = oldEdgesMap.get(key);
-        const fromName = newNodeMap[edge.from] || edge.from;
-        const toName = newNodeMap[edge.to] || edge.to;
-        const displayId = `${fromName} → ${toName}`;
-        if (!oldEdge || oldEdge.label !== edge.label || oldEdge.title !== edge.title) {
-          changedEdges.push(key);
-          addDiffRow("Edge", displayId, oldEdge, edge);
-        }
-      }
-
-      const { getPositions } = await renderGraph("oldGraph", oldRes);
-      const fixedPositions = await getPositions();
-      await renderGraph("newGraph", newRes, fixedPositions, changedEdges);
     }
 
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-    script.onload = renderBothGraphs;
-    document.head.appendChild(script);
-  </script>
+    const { getPositions } = await renderGraph("oldGraph", oldRes);
+    const fixedPositions = await getPositions();
+    await renderGraph("newGraph", newRes, fixedPositions, changedEdges);
+  }
+
+  const script = document.createElement("script");
+  script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+  script.onload = renderBothGraphs;
+  document.head.appendChild(script);
+</script>
 </body>
 </html>
