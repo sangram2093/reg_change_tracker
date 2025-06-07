@@ -52,21 +52,40 @@
       white-space: pre-line;
     }
     #diffTable {
-      width: 96%;
-      margin: 20px auto;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-    #diffTable th, #diffTable td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      vertical-align: top;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
-    #diffTable th {
-      background-color: #eee;
-    }
+	  width: 96%;
+	  margin: 20px auto;
+	  border-collapse: collapse;
+	  table-layout: auto; /* Allow flexible sizing */
+	}
+
+	#diffTable th, #diffTable td {
+	  border: 1px solid #ccc;
+	  padding: 8px;
+	  vertical-align: top;
+	  word-wrap: break-word;
+	  white-space: pre-wrap;
+	}
+
+	#diffTable th {
+	  background-color: #eee;
+	}
+
+	#diffTable th:nth-child(1),
+	#diffTable td:nth-child(1) {
+	  width: 8%;
+	}
+
+	#diffTable th:nth-child(2),
+	#diffTable td:nth-child(2) {
+	  width: 20%;
+	}
+
+	#diffTable th:nth-child(3),
+	#diffTable td:nth-child(3),
+	#diffTable th:nth-child(4),
+	#diffTable td:nth-child(4) {
+	  width: 36%;
+	}
     .download-btn {
       margin: 10px;
       padding: 10px 20px;
