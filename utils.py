@@ -1,8 +1,7 @@
 import fitz  # PyMuPDF
 import json
 import networkx as nx
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
+from docx import Document
 
 def extract_text_from_pdf(path):
     """Extracts text from a PDF file."""
@@ -59,38 +58,22 @@ def compare_graphs(G_old, G_new):
 
     return changed_edges, added_nodes, removed_nodes
 
-def generate_kop(old_summary, new_summary, old_json_str, new_json_str, output_path):
-    packet = BytesIO()
-    c = canvas.Canvas(output_path, pagesize=A4)
-    width, height = A4
+def generate_kop_docx(new_summary, new_json_str, output_path, llm_client):
+    prompt = (
+        "Given the original document, pickup the modality of reporting. "
+        "Given this particular graph, pickup the necessary actions to be performed. "
+        "Generate a KOP document with step wise instruction for operational personnel."
+    )
 
-    def draw_section(title, content, start_y):
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(40, start_y, title)
-        c.setFont("Helvetica", 10)
-        lines = content.split("\n")
-        y = start_y - 15
-        for line in lines:
-            for wrapped in split_line(line, 100):
-                if y < 40:
-                    c.showPage()
-                    y = height - 40
-                    c.setFont("Helvetica", 10)
-                c.drawString(40, y, wrapped)
-                y -= 14
-        return y - 20
+    entity_data = json.loads(new_json_str)
+    full_prompt = f"{prompt}\n\nDocument Summary:\n{new_summary}\n\nEntity Relationships:\n{json.dumps(entity_data, indent=2)}"
 
-    def split_line(line, max_chars=100):
-        return [line[i:i+max_chars] for i in range(0, len(line), max_chars)]
+    kop_response = llm_client(full_prompt)  # Assuming a function that queries Gemini or VertexAI
 
-    y = height - 40
-    y = draw_section("Old Regulation Summary", old_summary, y)
-    y = draw_section("New Regulation Summary", new_summary, y)
+    doc = Document()
+    doc.add_heading("Key Operating Procedure (KOP)", level=1)
+    for line in kop_response.split('\n'):
+        if line.strip():
+            doc.add_paragraph(line.strip())
 
-    old_json = json.loads(old_json_str)
-    new_json = json.loads(new_json_str)
-
-    y = draw_section("Old Entity Relationships", json.dumps(old_json, indent=2), y)
-    y = draw_section("New Entity Relationships", json.dumps(new_json, indent=2), y)
-
-    c.save()
+    doc.save(output_path)
