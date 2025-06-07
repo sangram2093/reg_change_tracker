@@ -99,9 +99,15 @@ def approve(upload_id):
     if not (summary and graph):
         return "Missing data for approval.", 400
 
-    output_pdf = f"KOP_Upload_{upload_id}.pdf"
-    generate_kop(summary.old_summary, summary.new_summary, graph.old_json, graph.new_json, output_path=output_pdf)
-    return send_file(output_pdf, as_attachment=True)
+    output_docx = f"KOP_Upload_{upload_id}.docx"
+    generate_kop_docx(
+        new_summary=summary.new_summary,
+        new_json_str=graph.new_json,
+        output_path=output_docx,
+        llm_client=run_gemini_prompt
+    )
+
+    return send_file(output_docx, as_attachment=True)
 
 @app.route("/history")
 def history():
