@@ -59,6 +59,7 @@
     #diffTable th, #diffTable td {
       border: 1px solid #ccc;
       padding: 8px;
+      vertical-align: top;
     }
     #diffTable th {
       background-color: #eee;
@@ -79,15 +80,6 @@
     .button-container {
       text-align: center;
       margin-top: 20px;
-    }
-    pre.pretty {
-      font-family: Consolas, monospace;
-      white-space: pre-wrap;
-      background: #f8f8f8;
-      padding: 8px;
-      border-radius: 4px;
-      max-width: 100%;
-      overflow-x: auto;
     }
   </style>
 </head>
@@ -116,8 +108,9 @@
       <tr>
         <th>Type</th>
         <th>ID</th>
-        <th>Old</th>
-        <th>New</th>
+        <th>Attribute</th>
+        <th>Old Value</th>
+        <th>New Value</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -212,27 +205,27 @@
       };
     }
 
-    function addDiffRow(type, id, oldVal, newVal) {
+    function addFormattedDiffRow(type, id, attribute, oldVal, newVal) {
       const tbody = document.querySelector("#diffTable tbody");
       const row = document.createElement("tr");
-
-      const prettyOld = document.createElement("td");
-      const prettyNew = document.createElement("td");
-      prettyOld.innerHTML = `<pre class="pretty">${formatPretty(oldVal)}</pre>`;
-      prettyNew.innerHTML = `<pre class="pretty">${formatPretty(newVal)}</pre>`;
-
-      row.innerHTML = `<td>${type}</td><td>${id}</td>`;
-      row.appendChild(prettyOld);
-      row.appendChild(prettyNew);
+      row.innerHTML = `
+        <td>${type}</td>
+        <td>${id}</td>
+        <td>${attribute}</td>
+        <td>${oldVal || "-"}</td>
+        <td>${newVal || "-"}</td>`;
       tbody.appendChild(row);
     }
 
-    function formatPretty(value) {
-      try {
-        return JSON.stringify(JSON.parse(value), null, 2);
-      } catch (e) {
-        return value || "-";
-      }
+    function compareObjects(type, id, oldObj, newObj) {
+      const keys = new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})]);
+      keys.forEach(key => {
+        const oldVal = oldObj?.[key] ?? "";
+        const newVal = newObj?.[key] ?? "";
+        if (oldVal !== newVal) {
+          addFormattedDiffRow(type, id, key, oldVal, newVal);
+        }
+      });
     }
 
     function downloadGraph(containerId) {
@@ -284,8 +277,8 @@
       const newNodeMap = new Map(newRes.nodes.map(n => [n.id, n]));
       for (const [id, newNode] of newNodeMap.entries()) {
         const oldNode = oldNodeMap.get(id);
-        if (!oldNode || oldNode.label !== newNode.label || oldNode.group !== newNode.group) {
-          addDiffRow("Node", id, JSON.stringify(oldNode), JSON.stringify(newNode));
+        if (!oldNode || JSON.stringify(oldNode) !== JSON.stringify(newNode)) {
+          compareObjects("Node", id, oldNode, newNode);
         }
       }
 
@@ -294,9 +287,9 @@
       for (const edge of newRes.edges) {
         const key = edgeKey(edge);
         const oldEdge = oldEdgesMap.get(key);
-        if (!oldEdge || oldEdge.label !== edge.label || oldEdge.title !== edge.title) {
+        if (!oldEdge || JSON.stringify(oldEdge) !== JSON.stringify(edge)) {
+          compareObjects("Edge", key, oldEdge, edge);
           changedEdges.push(key);
-          addDiffRow("Edge", key, JSON.stringify(oldEdge), JSON.stringify(edge));
         }
       }
 
