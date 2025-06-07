@@ -59,23 +59,23 @@ def compare_graphs(G_old, G_new):
     return changed_edges, added_nodes, removed_nodes
 
 class PDF(FPDF):
+    def __init__(self):
+        super().__init__()
+        self.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)  # Ensure DejaVuSans.ttf is in your project folder
+        self.set_font("DejaVu", "", 12)
+
     def header(self):
-        self.set_font("DejaVu", size=12)
+        self.set_font("DejaVu", "", 12)
         self.cell(0, 10, "Knowledge of Process (KOP) Document", ln=True, align="C")
 
     def footer(self):
         self.set_y(-15)
-        self.set_font("DejaVu", size=8)
+        self.set_font("DejaVu", "", 8)
         self.cell(0, 10, f"Page {self.page_no()}", align="C")
 
-def generate_kop(summary_old, summary_new, entity_json_old, entity_json_new):
-    """Generates a Unicode-compliant PDF containing summaries and relationships."""
+def generate_kop(summary_old, summary_new, entity_json_old, entity_json_new, output_path="KOP_Document.pdf"):
     pdf = PDF()
     pdf.add_page()
-
-    # Load Unicode-compatible font
-    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-    pdf.set_font("DejaVu", "", 12)
 
     pdf.multi_cell(0, 10, "=== Old Summary ===")
     pdf.multi_cell(0, 10, summary_old)
@@ -86,12 +86,11 @@ def generate_kop(summary_old, summary_new, entity_json_old, entity_json_new):
     pdf.ln(10)
 
     pdf.multi_cell(0, 10, "=== Old Entity Relationship ===")
-    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_old), indent=2))
+    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_old), indent=2, ensure_ascii=False))
     pdf.ln(10)
 
     pdf.multi_cell(0, 10, "=== New Entity Relationship ===")
-    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_new), indent=2))
+    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_new), indent=2, ensure_ascii=False))
 
-    file_path = "KOP_Document.pdf"
-    pdf.output(file_path)
-    return file_path
+    pdf.output(output_path)
+    return output_path
