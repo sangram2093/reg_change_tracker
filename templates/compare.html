@@ -95,7 +95,7 @@
     <thead>
       <tr>
         <th>Type</th>
-        <th>Name / Connection</th>
+        <th>Connection / Name</th>
         <th>Attribute</th>
         <th>Old Value</th>
         <th>New Value</th>
@@ -124,8 +124,8 @@
         <td>${type}</td>
         <td>${name}</td>
         <td>${attribute}</td>
-        <td>${oldVal || "-"}</td>
-        <td>${newVal || "-"}</td>
+        <td><pre>${oldVal || "-"}</pre></td>
+        <td><pre>${newVal || "-"}</pre></td>
       `;
       tbody.appendChild(row);
     }
@@ -185,26 +185,9 @@
         return edge;
       }));
 
-      if (fixedPositions) {
-        nodesDataSet.forEach(node => {
-          const pos = fixedPositions[node.id];
-          if (pos) {
-            node.x = pos.x;
-            node.y = pos.y;
-            node.fixed = { x: true, y: true };
-            nodesDataSet.update(node);
-          }
-        });
-      }
-
-      const network = new vis.Network(container, {
-        nodes: nodesDataSet,
-        edges: edgesDataSet
-      }, {
+      const options = {
         layout: { improvedLayout: true },
-        physics: {
-          enabled: !fixedPositions
-        },
+        interaction: { hover: true, tooltipDelay: 100 },
         nodes: {
           shape: "dot",
           size: 20,
@@ -213,9 +196,22 @@
         edges: {
           arrows: "to",
           font: { align: "middle", size: 12, color: "#333" },
-          color: { color: "#848484", highlight: "#848484", hover: "#848484" }
+          color: { color: "#848484", highlight: "#848484", hover: "#848484" },
+          smooth: { type: "dynamic" }
+        },
+        physics: {
+          enabled: !fixedPositions,
+          barnesHut: {
+            gravitationalConstant: -30000,
+            springLength: 100
+          }
         }
-      });
+      };
+
+      const network = new vis.Network(container, {
+        nodes: nodesDataSet,
+        edges: edgesDataSet
+      }, options);
 
       return {
         network,
