@@ -6,29 +6,29 @@ CREATE TABLE regulations (
 CREATE TABLE uploads (
     id SERIAL PRIMARY KEY,
     regulation_id INTEGER NOT NULL REFERENCES regulations(id),
-    old_path VARCHAR(1024) NOT NULL,
-    new_path VARCHAR(1024) NOT NULL,
+    old_path TEXT NOT NULL,
+    new_path TEXT NOT NULL,
     upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE graphs (
+CREATE TABLE summaries (
     id SERIAL PRIMARY KEY,
     upload_id INTEGER NOT NULL REFERENCES uploads(id),
-    graph_old_json TEXT NOT NULL,
-    graph_new_json TEXT NOT NULL,
-    diff_json TEXT
+    old_summary TEXT NOT NULL,
+    new_summary TEXT NOT NULL
 );
 
-CREATE TABLE logs (
+CREATE TABLE entity_graphs (
     id SERIAL PRIMARY KEY,
     upload_id INTEGER NOT NULL REFERENCES uploads(id),
-    summary_text TEXT,
-    raw_llm_response TEXT
+    old_json TEXT NOT NULL,
+    new_json TEXT NOT NULL,
+    graph_old TEXT NOT NULL,
+    graph_new TEXT NOT NULL
 );
 
-CREATE TABLE kops (
-    id SERIAL PRIMARY KEY,
-    upload_id INTEGER NOT NULL REFERENCES uploads(id),
-    kop_text TEXT,
-    generated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+INSERT INTO regulations (name) VALUES
+('EMIR Refit'),
+('MiFID II'),
+('SFTR')
+ON CONFLICT (name) DO NOTHING;
