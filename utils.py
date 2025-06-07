@@ -1,7 +1,7 @@
 import fitz  # PyMuPDF
 import json
 import networkx as nx
-
+from fpdf import FPDF
 
 def extract_text_from_pdf(path):
     """Extracts text from a PDF file."""
@@ -11,22 +11,16 @@ def extract_text_from_pdf(path):
             text += page.get_text()
     return text
 
-
 def parse_graph_data(relationship_json):
-    """
-    Converts entity relationship JSON into a NetworkX DiGraph.
-    Each edge has properties that will be used in tooltips (title in vis.js).
-    """
+    """Parses entity relationship JSON into NetworkX DiGraph with vis.js-compatible properties."""
     if isinstance(relationship_json, str):
         relationship_json = json.loads(relationship_json)
 
     G = nx.DiGraph()
 
-    # Add nodes
     for entity in relationship_json.get("entities", []):
         G.add_node(entity["id"], label=entity["name"], group=entity["type"])
 
-    # Add edges with detailed relationship information in the tooltip
     for rel in relationship_json.get("relationships", []):
         tooltip_lines = [
             f"Verb: {rel.get('verb', '')}",
@@ -47,14 +41,8 @@ def parse_graph_data(relationship_json):
 
     return G
 
-
 def compare_graphs(G_old, G_new):
-    """
-    Compares two graphs (old and new) and returns sets of:
-    - changed_edges: edges whose label or title differs
-    - added_nodes: new nodes in G_new
-    - removed_nodes: nodes that were removed
-    """
+    """Compares old and new graphs to identify changed edges and nodes."""
     changed_edges = []
     added_nodes = list(set(G_new.nodes) - set(G_old.nodes))
     removed_nodes = list(set(G_old.nodes) - set(G_new.nodes))
@@ -70,8 +58,40 @@ def compare_graphs(G_old, G_new):
 
     return changed_edges, added_nodes, removed_nodes
 
+class PDF(FPDF):
+    def header(self):
+        self.set_font("DejaVu", size=12)
+        self.cell(0, 10, "Knowledge of Process (KOP) Document", ln=True, align="C")
 
-def generate_kop(summary_text):
-    header = "Key Operating Procedure (KOP) Document\n\n"
-    intro = "This KOP document is generated based on the approved changes extracted from regulation text.\n\n"
-    return header + intro + summary_text
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("DejaVu", size=8)
+        self.cell(0, 10, f"Page {self.page_no()}", align="C")
+
+def generate_kop(summary_old, summary_new, entity_json_old, entity_json_new):
+    """Generates a Unicode-compliant PDF containing summaries and relationships."""
+    pdf = PDF()
+    pdf.add_page()
+
+    # Load Unicode-compatible font
+    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+    pdf.set_font("DejaVu", "", 12)
+
+    pdf.multi_cell(0, 10, "=== Old Summary ===")
+    pdf.multi_cell(0, 10, summary_old)
+    pdf.ln(10)
+
+    pdf.multi_cell(0, 10, "=== New Summary ===")
+    pdf.multi_cell(0, 10, summary_new)
+    pdf.ln(10)
+
+    pdf.multi_cell(0, 10, "=== Old Entity Relationship ===")
+    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_old), indent=2))
+    pdf.ln(10)
+
+    pdf.multi_cell(0, 10, "=== New Entity Relationship ===")
+    pdf.multi_cell(0, 10, json.dumps(json.loads(entity_json_new), indent=2))
+
+    file_path = "KOP_Document.pdf"
+    pdf.output(file_path)
+    return file_path
