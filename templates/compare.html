@@ -39,15 +39,30 @@
     #oldGraph, #newGraph {
       height: calc(100% - 30px);
     }
+    .tooltip {
+      position: absolute;
+      visibility: hidden;
+      padding: 6px;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 1000;
+      pointer-events: none;
+      white-space: pre-line;
+    }
     #diffTable {
       width: 96%;
       margin: 20px auto;
       border-collapse: collapse;
+      table-layout: fixed;
     }
     #diffTable th, #diffTable td {
       border: 1px solid #ccc;
       padding: 8px;
       vertical-align: top;
+      word-wrap: break-word;
+      white-space: pre-wrap;
     }
     #diffTable th {
       background-color: #eee;
@@ -95,89 +110,49 @@
     <thead>
       <tr>
         <th>Type</th>
-        <th>Connection / Name</th>
-        <th>Attribute</th>
-        <th>Old Value</th>
-        <th>New Value</th>
+        <th>Entity</th>
+        <th>Old</th>
+        <th>New</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
+  <div id="tooltip" class="tooltip"></div>
+
   <script>
     const uploadId = {{ upload_id | safe }};
+    const tooltip = document.getElementById("tooltip");
 
     function edgeKey(edge) {
       return `${edge.from}->${edge.to}`;
     }
 
-    function formatEdgeLabel(edge, nodeMap) {
-      const from = nodeMap.get(edge.from)?.label || edge.from;
-      const to = nodeMap.get(edge.to)?.label || edge.to;
-      return `${from} → ${to}`;
+    function extractLabelMap(nodes) {
+      const map = {};
+      for (const node of nodes) {
+        map[node.id] = node.label || node.id;
+      }
+      return map;
     }
 
-    function addDiffRow(type, name, attribute, oldVal, newVal) {
+    function addDiffRow(type, id, oldVal, newVal) {
       const tbody = document.querySelector("#diffTable tbody");
       const row = document.createElement("tr");
       row.innerHTML = `
         <td>${type}</td>
-        <td>${name}</td>
-        <td>${attribute}</td>
+        <td>${id}</td>
         <td><pre>${oldVal || "-"}</pre></td>
-        <td><pre>${newVal || "-"}</pre></td>
-      `;
+        <td><pre>${newVal || "-"}</pre></td>`;
       tbody.appendChild(row);
-    }
-
-    function compareObjects(type, name, oldObj, newObj) {
-      const keys = new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})]);
-      keys.forEach(key => {
-        const oldVal = oldObj?.[key] ?? "";
-        const newVal = newObj?.[key] ?? "";
-        if (oldVal !== newVal) {
-          addDiffRow(type, name, key, oldVal, newVal);
-        }
-      });
-    }
-
-    async function renderBothGraphs() {
-      const [oldRes, newRes] = await Promise.all([
-        fetch(`/graph_data/${uploadId}/old`).then(r => r.json()),
-        fetch(`/graph_data/${uploadId}/new`).then(r => r.json())
-      ]);
-
-      const oldNodeMap = new Map(oldRes.nodes.map(n => [n.id, n]));
-      const newNodeMap = new Map(newRes.nodes.map(n => [n.id, n]));
-
-      for (const [id, newNode] of newNodeMap.entries()) {
-        const oldNode = oldNodeMap.get(id);
-        if (!oldNode || JSON.stringify(oldNode) !== JSON.stringify(newNode)) {
-          compareObjects("Node", newNode.label || id, oldNode, newNode);
-        }
-      }
-
-      const oldEdgesMap = new Map(oldRes.edges.map(e => [edgeKey(e), e]));
-      const changedEdges = [];
-      for (const edge of newRes.edges) {
-        const key = edgeKey(edge);
-        const oldEdge = oldEdgesMap.get(key);
-        if (!oldEdge || JSON.stringify(oldEdge) !== JSON.stringify(edge)) {
-          const label = formatEdgeLabel(edge, newNodeMap);
-          compareObjects("Edge", label, oldEdge, edge);
-          changedEdges.push(key);
-        }
-      }
-
-      const { getPositions } = await renderGraph("oldGraph", oldRes);
-      const fixedPositions = await getPositions();
-      await renderGraph("newGraph", newRes, fixedPositions, changedEdges);
     }
 
     async function renderGraph(containerId, data, fixedPositions = null, highlightEdges = []) {
       const container = document.getElementById(containerId);
+
       const nodesDataSet = new vis.DataSet(data.nodes);
       const edgesDataSet = new vis.DataSet(data.edges.map(edge => {
+        edge.title = edge.title || '';
         if (highlightEdges.includes(edgeKey(edge))) {
           edge.color = { color: 'red' };
           edge.font = { color: 'red', bold: true };
@@ -185,9 +160,31 @@
         return edge;
       }));
 
-      const options = {
+      if (fixedPositions) {
+        nodesDataSet.forEach(node => {
+          const pos = fixedPositions[node.id];
+          if (pos) {
+            node.x = pos.x;
+            node.y = pos.y;
+            node.fixed = { x: true, y: true };
+            nodesDataSet.update(node);
+          }
+        });
+      }
+
+      const network = new vis.Network(container, {
+        nodes: nodesDataSet,
+        edges: edgesDataSet
+      }, {
         layout: { improvedLayout: true },
         interaction: { hover: true, tooltipDelay: 100 },
+        physics: {
+          enabled: !fixedPositions,
+          barnesHut: {
+            gravitationalConstant: -30000,
+            springLength: 100
+          }
+        },
         nodes: {
           shape: "dot",
           size: 20,
@@ -198,27 +195,31 @@
           font: { align: "middle", size: 12, color: "#333" },
           color: { color: "#848484", highlight: "#848484", hover: "#848484" },
           smooth: { type: "dynamic" }
-        },
-        physics: {
-          enabled: !fixedPositions,
-          barnesHut: {
-            gravitationalConstant: -30000,
-            springLength: 100
-          }
         }
-      };
+      });
 
-      const network = new vis.Network(container, {
-        nodes: nodesDataSet,
-        edges: edgesDataSet
-      }, options);
+      network.on("hoverEdge", function (params) {
+        const edge = edgesDataSet.get(params.edge);
+        if (edge && edge.title) {
+          tooltip.innerText = edge.title;
+          tooltip.style.left = params.event.pageX + 10 + "px";
+          tooltip.style.top = params.event.pageY + 10 + "px";
+          tooltip.style.visibility = "visible";
+        }
+      });
+
+      network.on("blurEdge", function () {
+        tooltip.style.visibility = "hidden";
+      });
 
       return {
         network,
         getPositions: () =>
           new Promise(resolve => {
             if (!fixedPositions) {
-              network.once("stabilized", () => resolve(network.getPositions()));
+              network.once("stabilized", () => {
+                resolve(network.getPositions());
+              });
             } else {
               resolve(null);
             }
@@ -263,6 +264,45 @@
 
     function goHome() {
       window.location.href = "/";
+    }
+
+    async function renderBothGraphs() {
+      const [oldRes, newRes] = await Promise.all([
+        fetch(`/graph_data/${uploadId}/old`).then(r => r.json()),
+        fetch(`/graph_data/${uploadId}/new`).then(r => r.json())
+      ]);
+
+      const oldLabelMap = extractLabelMap(oldRes.nodes);
+      const newLabelMap = extractLabelMap(newRes.nodes);
+
+      const oldNodeMap = new Map(oldRes.nodes.map(n => [n.id, n]));
+      const newNodeMap = new Map(newRes.nodes.map(n => [n.id, n]));
+
+      for (const [id, newNode] of newNodeMap.entries()) {
+        const oldNode = oldNodeMap.get(id);
+        if (!oldNode || oldNode.label !== newNode.label || oldNode.group !== newNode.group) {
+          addDiffRow("Node", newNode.label || id, JSON.stringify(oldNode, null, 2), JSON.stringify(newNode, null, 2));
+        }
+      }
+
+      const oldEdgesMap = new Map(oldRes.edges.map(e => [edgeKey(e), e]));
+      const changedEdges = [];
+
+      for (const edge of newRes.edges) {
+        const key = edgeKey(edge);
+        const oldEdge = oldEdgesMap.get(key);
+        const fromName = newLabelMap[edge.from] || edge.from;
+        const toName = newLabelMap[edge.to] || edge.to;
+        const displayId = `${fromName} → ${toName}`;
+        if (!oldEdge || oldEdge.label !== edge.label || oldEdge.title !== edge.title) {
+          changedEdges.push(key);
+          addDiffRow("Edge", displayId, JSON.stringify(oldEdge, null, 2), JSON.stringify(edge, null, 2));
+        }
+      }
+
+      const { getPositions } = await renderGraph("oldGraph", oldRes);
+      const fixedPositions = await getPositions();
+      await renderGraph("newGraph", newRes, fixedPositions, changedEdges);
     }
 
     const script = document.createElement("script");
