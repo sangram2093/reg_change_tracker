@@ -6,6 +6,9 @@ from datetime import datetime
 from vertex_llm import init_vertexai, get_summary_with_context, get_entity_relationship_with_context
 from utils import extract_text_from_pdf, parse_graph_data, generate_kop
 from db_models import db, Regulation, Upload, Summary, EntityGraph
+from docx import Document
+from docx.shared import Pt
+from io import BytesIO
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://db_admin:pwd@127.0.0.1:5432/postgres'
@@ -33,6 +36,43 @@ def index():
         return redirect(url_for("compare", upload_id=upload.id))
 
     return render_template("index.html", regulations=regulations)
+
+def markdown_to_docx(doc: Document, text: str):
+    lines = text.split('\n')
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            doc.add_paragraph()
+            continue
+
+        # Headings
+        if stripped.startswith("###"):
+            doc.add_heading(stripped.lstrip("#").strip(), level=3)
+        elif stripped.startswith("##"):
+            doc.add_heading(stripped.lstrip("#").strip(), level=2)
+        elif stripped.startswith("#"):
+            doc.add_heading(stripped.lstrip("#").strip(), level=1)
+
+        # Bullets
+        elif stripped.startswith("- "):
+            doc.add_paragraph(stripped[2:], style='List Bullet')
+
+        # Numbered list
+        elif re.match(r'^\d+\.\s', stripped):
+            doc.add_paragraph(re.sub(r'^\d+\.\s', '', stripped), style='List Number')
+
+        # Bold text
+        elif "**" in stripped:
+            para = doc.add_paragraph()
+            while "**" in stripped:
+                before, bold, rest = stripped.split("**", 2)
+                para.add_run(before)
+                bold_run = para.add_run(bold)
+                bold_run.bold = True
+                stripped = rest
+            para.add_run(stripped)
+        else:
+            doc.add_paragraph(stripped)
 
 def process_upload(upload_id):
     upload = Upload.query.get(upload_id)
@@ -94,20 +134,39 @@ def regenerate(upload_id):
 
 @app.route("/approve/<int:upload_id>", methods=["POST"])
 def approve(upload_id):
+    # Get summaries and entity graphs
     summary = Summary.query.filter_by(upload_id=upload_id).first()
     graph = EntityGraph.query.filter_by(upload_id=upload_id).first()
-    if not (summary and graph):
-        return "Missing data for approval.", 400
+    if not summary or not graph:
+        return "Data not found", 404
 
-    output_docx = f"KOP_Upload_{upload_id}.docx"
-    generate_kop_docx(
-        new_summary=summary.new_summary,
-        new_json_str=graph.new_json,
-        output_path=output_docx,
-        llm_client=run_gemini_prompt
+    # Call LLM with prompt
+    prompt = (
+        "Given the original document, pickup the modality of reporting. "
+        "Given this particular graph, pickup the necessary actions to be performed. "
+        "Generate a KOP document with step wise instruction for operational personel.\n\n"
+        f"Summary:\n{summary.new_summary}\n\n"
+        f"Entity Relationship JSON:\n{graph.new_json}"
     )
 
-    return send_file(output_docx, as_attachment=True)
+    kop_response = get_summary_with_context(prompt)  # Reuse Gemini API logic
+
+    # Create Word doc
+    doc = Document()
+    doc.add_heading("Key Operating Procedure (KOP)", 0)
+    markdown_to_docx(doc, kop_response)
+
+    # Output to BytesIO stream
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"kop_upload_{upload_id}.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
 
 @app.route("/history")
 def history():
