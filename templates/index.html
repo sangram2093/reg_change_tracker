@@ -2,99 +2,90 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Regulation Comparison Upload</title>
+  <title>Upload Regulation PDFs</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f4f7f9;
-      margin: 0;
-      padding: 0;
+      margin: 30px;
     }
-
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      background: #fff;
-      padding: 30px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-
     h2 {
       text-align: center;
-      margin-bottom: 20px;
     }
-
+    form {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #f7f7f7;
+      padding: 20px;
+      border-radius: 8px;
+    }
     label {
       display: block;
       margin-top: 15px;
       font-weight: bold;
     }
-
-    input[type="text"],
-    select {
+    input[type="text"], select {
       width: 100%;
-      padding: 10px;
+      padding: 8px;
       margin-top: 5px;
-      border: 1px solid #ccc;
       border-radius: 4px;
+      border: 1px solid #ccc;
     }
-
+    .radio-group {
+      margin-top: 10px;
+    }
+    .radio-group input {
+      margin-right: 10px;
+    }
+    .form-section {
+      margin-top: 10px;
+    }
     button {
+      margin-top: 20px;
       width: 100%;
       padding: 12px;
-      background-color: #007bff;
-      color: white;
       font-size: 16px;
+      background-color: #007BFF;
+      color: white;
       border: none;
-      border-radius: 4px;
-      margin-top: 20px;
+      border-radius: 6px;
       cursor: pointer;
     }
-
     button:hover {
       background-color: #0056b3;
     }
-
-    .history-link {
-      text-align: center;
-      margin-top: 25px;
-    }
-
-    .history-link a {
-      text-decoration: none;
-      font-weight: bold;
-      color: #007bff;
-    }
-
-    .history-link a:hover {
-      text-decoration: underline;
-    }
   </style>
+  <script>
+    function togglePdfInputs(type) {
+      document.getElementById("oldPdfGroup").style.display = type === 'comparison' ? 'block' : 'none';
+    }
+  </script>
 </head>
 <body>
-  <div class="container">
-    <h2>Upload Regulation PDFs</h2>
-    <form method="POST">
-      <label for="regulation">Select Regulation</label>
-      <select name="regulation" id="regulation" required>
-        {% for regulation in regulations %}
-          <option value="{{ regulation.id }}">{{ regulation.name }}</option>
-        {% endfor %}
-      </select>
+  <h2>Upload Regulation PDF(s)</h2>
 
-      <label for="old_path">Old Regulation PDF Path</label>
-      <input type="text" name="old_path" id="old_path" placeholder="/path/to/old.pdf" required>
+  <form method="POST">
+    <label for="regulation">Regulation Name</label>
+    <select name="regulation" required>
+      {% for reg in regulations %}
+        <option value="{{ reg.id }}">{{ reg.name }}</option>
+      {% endfor %}
+    </select>
 
-      <label for="new_path">New Regulation PDF Path</label>
-      <input type="text" name="new_path" id="new_path" placeholder="/path/to/new.pdf" required>
-
-      <button type="submit">Generate Graph</button>
-    </form>
-
-    <div class="history-link">
-      <a href="/history">View Upload History</a>
+    <label>Upload Type</label>
+    <div class="radio-group">
+      <input type="radio" name="upload_type" value="first" checked onclick="togglePdfInputs('first')"> First Time Upload
+      <input type="radio" name="upload_type" value="comparison" onclick="togglePdfInputs('comparison')"> Compare with Previous
     </div>
-  </div>
+
+    <div id="oldPdfGroup" style="display: none;">
+      <label for="old_path">Old Regulation PDF Path</label>
+      <input type="text" name="old_path" placeholder="Path to old regulation PDF">
+    </div>
+
+    <label for="new_path">New Regulation PDF Path</label>
+    <input type="text" name="new_path" required placeholder="Path to new regulation PDF">
+
+    <button type="submit">Upload & Process</button>
+  </form>
 </body>
 </html>
