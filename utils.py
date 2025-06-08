@@ -60,61 +60,30 @@ def compare_graphs(G_old, G_new):
     return changed_edges, added_nodes, removed_nodes
 
 def markdown_to_docx(doc: Document, text: str):
-    """Converts markdown-style Gemini response into formatted Word content."""
     lines = text.split('\n')
     for line in lines:
         stripped = line.strip()
         if not stripped:
             doc.add_paragraph()
             continue
-
-        # Headings
         if stripped.startswith("###"):
             doc.add_heading(stripped.lstrip("#").strip(), level=3)
         elif stripped.startswith("##"):
             doc.add_heading(stripped.lstrip("#").strip(), level=2)
         elif stripped.startswith("#"):
             doc.add_heading(stripped.lstrip("#").strip(), level=1)
-
-        # Bullets
         elif stripped.startswith("- "):
             doc.add_paragraph(stripped[2:], style='List Bullet')
-
-        # Numbered list
         elif re.match(r'^\d+\.\s', stripped):
             doc.add_paragraph(re.sub(r'^\d+\.\s', '', stripped), style='List Number')
-
-        # Bold
         elif "**" in stripped:
             para = doc.add_paragraph()
             while "**" in stripped:
-                if "**" not in stripped:
-                    para.add_run(stripped)
-                    break
                 before, bold, rest = stripped.split("**", 2)
                 para.add_run(before)
                 bold_run = para.add_run(bold)
                 bold_run.bold = True
                 stripped = rest
             para.add_run(stripped)
-
         else:
             doc.add_paragraph(stripped)
-
-def generate_kop_docx(new_summary, new_json_str, output_path, llm_client):
-    """Generates a Word doc KOP using Gemini/Vertex LLM output."""
-    prompt = (
-        "Given the original document, pickup the modality of reporting. "
-        "Given this particular graph, pickup the necessary actions to be performed. "
-        "Generate a KOP document with step wise instruction for operational personnel."
-    )
-
-    entity_data = json.loads(new_json_str)
-    full_prompt = f"{prompt}\n\nDocument Summary:\n{new_summary}\n\nEntity Relationships:\n{json.dumps(entity_data, indent=2)}"
-
-    kop_response = llm_client(full_prompt)
-
-    doc = Document()
-    doc.add_heading("Key Operating Procedure (KOP)", level=1)
-    markdown_to_docx(doc, kop_response)
-    doc.save(output_path)
