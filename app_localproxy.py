@@ -4,8 +4,8 @@ import re
 from flask import Flask, request, render_template, redirect, url_for, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from vertex_llm import init_vertexai, get_summary_with_context, get_entity_relationship_with_context
-from utils import extract_text_from_pdf, parse_graph_data, generate_kop
+from vertex_llm import init_vertexai, get_summary_with_context, get_entity_relationship_with_context, get_kop_doc
+from utils import extract_text_from_pdf, parse_graph_data, markdown_to_docx
 from db_models import db, Regulation, Upload, Summary, EntityGraph
 from docx import Document
 from io import BytesIO
@@ -22,51 +22,26 @@ def index():
     regulations = Regulation.query.all()
     if request.method == "POST":
         regulation_id = request.form['regulation']
-        old_path = request.form['old_path'].strip()
-        new_path = request.form['new_path'].strip()
+        mode = request.form.get('upload_mode')  # New field to detect radio button
+        old_path = request.form.get('old_path', '').strip()
+        new_path = request.form.get('new_path', '').strip()
+        first_time_path = request.form.get('first_time_path', '').strip()
 
-        if not os.path.exists(old_path):
-            return "Old PDF path is invalid.", 400
-        if new_path and not os.path.exists(new_path):
-            return "New PDF path is invalid.", 400
+        if mode == "first_time":
+        if not os.path.exists(first_time_path):
+            return "New Regulation PDF path is invalid.", 400
+        upload = Upload(regulation_id=regulation_id, old_path=None, new_path=first_time_path)
+        else:
+            if not (os.path.exists(old_path) and os.path.exists(new_path)):
+                return "Old or New PDF path is invalid.", 400
+            upload = Upload(regulation_id=regulation_id, old_path=old_path, new_path=new_path)
 
-        upload = Upload(regulation_id=regulation_id, old_path=old_path, new_path=new_path)
         db.session.add(upload)
         db.session.commit()
-
         process_upload(upload.id)
         return redirect(url_for("compare", upload_id=upload.id))
 
     return render_template("index.html", regulations=regulations)
-
-def markdown_to_docx(doc: Document, text: str):
-    lines = text.split('\n')
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            doc.add_paragraph()
-            continue
-        if stripped.startswith("###"):
-            doc.add_heading(stripped.lstrip("#").strip(), level=3)
-        elif stripped.startswith("##"):
-            doc.add_heading(stripped.lstrip("#").strip(), level=2)
-        elif stripped.startswith("#"):
-            doc.add_heading(stripped.lstrip("#").strip(), level=1)
-        elif stripped.startswith("- "):
-            doc.add_paragraph(stripped[2:], style='List Bullet')
-        elif re.match(r'^\d+\.\s', stripped):
-            doc.add_paragraph(re.sub(r'^\d+\.\s', '', stripped), style='List Number')
-        elif "**" in stripped:
-            para = doc.add_paragraph()
-            while "**" in stripped:
-                before, bold, rest = stripped.split("**", 2)
-                para.add_run(before)
-                bold_run = para.add_run(bold)
-                bold_run.bold = True
-                stripped = rest
-            para.add_run(stripped)
-        else:
-            doc.add_paragraph(stripped)
 
 def process_upload(upload_id):
     upload = Upload.query.get(upload_id)
@@ -160,20 +135,11 @@ def approve(upload_id):
 
     if not summary.new_summary or not graph.new_json:
         return "New data missing. Please upload new regulation first.", 400
-
-    prompt = (
-        "Given the original document, pickup the modality of reporting. "
-        "Given this particular graph, pickup the necessary actions to be performed. "
-        "Generate a KOP document with step wise instruction for operational personel.\n\n"
-        f"Summary:\n{summary.new_summary}\n\n"
-        f"Entity Relationship JSON:\n{graph.new_json}"
-    )
-
-    kop_response = get_summary_with_context(prompt)
-
+    
+    kop_text = get_kop_doc(new_summary=summary.new_summary, new_json_str=graph.new_json)
     doc = Document()
     doc.add_heading("Key Operating Procedure (KOP)", 0)
-    markdown_to_docx(doc, kop_response)
+    markdown_to_docx(doc, kop_text)
 
     buffer = BytesIO()
     doc.save(buffer)
@@ -188,7 +154,7 @@ def approve(upload_id):
 
 @app.route("/history")
 def history():
-    uploads = Upload.query.order_by(Upload.created_at.desc()).all()
+    uploads = Upload.query.order_by(Upload.upload_time.desc()).all()
     return render_template("history.html", uploads=uploads)
 
 if __name__ == "__main__":
