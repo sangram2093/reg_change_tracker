@@ -80,6 +80,7 @@
     .diff-table-container {
       width: 96%;
       margin: 20px auto;
+      display: none;
     }
 
     #diffTable {
@@ -100,34 +101,35 @@
       background-color: #eee;
     }
 
-    #diffTable th:nth-child(1), #diffTable td:nth-child(1) {
+    #diffTable th:nth-child(1),
+    #diffTable td:nth-child(1) {
       width: 10%;
       white-space: nowrap;
     }
 
-    #diffTable th:nth-child(2), #diffTable td:nth-child(2) {
+    #diffTable th:nth-child(2),
+    #diffTable td:nth-child(2) {
       width: 20%;
       white-space: nowrap;
     }
 
-    #diffTable th:nth-child(3), #diffTable td:nth-child(3),
-    #diffTable th:nth-child(4), #diffTable td:nth-child(4) {
+    #diffTable th:nth-child(3),
+    #diffTable td:nth-child(3),
+    #diffTable th:nth-child(4),
+    #diffTable td:nth-child(4) {
       width: 35%;
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
     }
   </style>
 </head>
 <body>
   <h1>Regulatory Graph Comparison</h1>
 
-  <div class="container">
-    <div class="graph-box" id="oldContainer">
-      <div class="graph-header">Old Regulation Graph</div>
-      <div id="oldGraph"></div>
-    </div>
-    <div class="graph-box">
-      <div class="graph-header" id="newHeader">New Regulation Graph</div>
-      <div id="newGraph"></div>
-    </div>
+  <div class="container" id="graphContainer">
+    <!-- Graph boxes will be added dynamically -->
   </div>
 
   <div class="button-container">
@@ -137,7 +139,7 @@
     <button class="download-btn" onclick="downloadGraph('newGraph')">📥 Download New Graph as PNG</button>
   </div>
 
-  <div class="diff-table-container" id="diffTableSection">
+  <div class="diff-table-container" id="diffTableContainer">
     <table id="diffTable">
       <thead>
         <tr>
@@ -296,13 +298,28 @@
 
     async function renderBothGraphs() {
       const newRes = await fetch(`/graph_data/${uploadId}/new`).then(r => r.json());
-      const newNodeMap = new Map(newRes.nodes.map(n => [n.id, n]));
-
+      let oldRes = null;
       try {
-        const oldRes = await fetch(`/graph_data/${uploadId}/old`).then(r => r.json());
-        if (!oldRes || !oldRes.nodes || oldRes.nodes.length === 0) throw new Error("No old graph");
+        const res = await fetch(`/graph_data/${uploadId}/old`);
+        oldRes = res.status === 200 ? await res.json() : null;
+      } catch (_) {}
+
+      const graphContainer = document.getElementById("graphContainer");
+
+      if (oldRes && oldRes.nodes && oldRes.nodes.length) {
+        graphContainer.innerHTML = `
+          <div class="graph-box">
+            <div class="graph-header">Old Regulation Graph</div>
+            <div id="oldGraph"></div>
+          </div>
+          <div class="graph-box">
+            <div class="graph-header">New Regulation Graph</div>
+            <div id="newGraph"></div>
+          </div>
+        `;
 
         const oldNodeMap = new Map(oldRes.nodes.map(n => [n.id, n]));
+        const newNodeMap = new Map(newRes.nodes.map(n => [n.id, n]));
         const oldEdgesMap = new Map(oldRes.edges.map(e => [edgeKey(e), e]));
         const changedEdges = [];
 
@@ -321,11 +338,15 @@
         const { getPositions } = await renderGraph("oldGraph", oldRes);
         const fixedPositions = await getPositions();
         await renderGraph("newGraph", newRes, fixedPositions, changedEdges);
+        document.getElementById("diffTableContainer").style.display = "block";
 
-      } catch (err) {
-        document.getElementById("oldContainer").style.display = "none";
-        document.getElementById("newHeader").innerText = "Regulation Graph";
-        document.getElementById("diffTableSection").style.display = "none";
+      } else {
+        graphContainer.innerHTML = `
+          <div class="graph-box" style="width: 100%;">
+            <div class="graph-header">New Regulation Graph</div>
+            <div id="newGraph"></div>
+          </div>
+        `;
         await renderGraph("newGraph", newRes);
       }
     }
