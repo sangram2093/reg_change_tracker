@@ -6,86 +6,119 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 30px;
+      background-color: #f2f2f2;
+      padding: 40px;
     }
-    h2 {
+
+    h1 {
       text-align: center;
+      margin-bottom: 30px;
     }
-    form {
+
+    .form-container {
       max-width: 600px;
-      margin: 0 auto;
-      background: #f7f7f7;
-      padding: 20px;
-      border-radius: 8px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
+
     label {
       display: block;
       margin-top: 15px;
       font-weight: bold;
     }
-    input[type="text"], select {
+
+    input[type="text"],
+    select {
       width: 100%;
       padding: 8px;
       margin-top: 5px;
       border-radius: 4px;
       border: 1px solid #ccc;
     }
+
     .radio-group {
-      margin-top: 10px;
+      margin-top: 15px;
     }
-    .radio-group input {
-      margin-right: 10px;
+
+    .radio-group label {
+      display: inline-block;
+      font-weight: normal;
+      margin-right: 20px;
     }
-    .form-section {
-      margin-top: 10px;
-    }
-    button {
-      margin-top: 20px;
-      width: 100%;
-      padding: 12px;
-      font-size: 16px;
+
+    .btn-submit {
+      margin-top: 25px;
+      padding: 12px 20px;
       background-color: #007BFF;
       color: white;
+      font-size: 16px;
       border: none;
-      border-radius: 6px;
+      border-radius: 5px;
       cursor: pointer;
     }
-    button:hover {
+
+    .btn-submit:hover {
       background-color: #0056b3;
     }
-  </style>
-  <script>
-    function togglePdfInputs(type) {
-      document.getElementById("oldPdfGroup").style.display = type === 'comparison' ? 'block' : 'none';
+
+    .hidden {
+      display: none;
     }
-  </script>
+  </style>
 </head>
 <body>
-  <h2>Upload Regulation PDF(s)</h2>
+  <h1>Upload Regulation PDFs</h1>
+  <div class="form-container">
+    <form method="POST">
+      <label for="regulation">Select Regulation</label>
+      <select name="regulation" id="regulation" required>
+        {% for reg in regulations %}
+          <option value="{{ reg.id }}">{{ reg.name }}</option>
+        {% endfor %}
+      </select>
 
-  <form method="POST">
-    <label for="regulation">Regulation Name</label>
-    <select name="regulation" required>
-      {% for reg in regulations %}
-        <option value="{{ reg.id }}">{{ reg.name }}</option>
-      {% endfor %}
-    </select>
+      <div class="radio-group">
+        <label><input type="radio" name="upload_mode" value="compare" checked onchange="toggleUploadMode()"> Compare Old vs New PDF</label>
+        <label><input type="radio" name="upload_mode" value="first_time" onchange="toggleUploadMode()"> First Time Upload</label>
+      </div>
 
-    <label>Upload Type</label>
-    <div class="radio-group">
-      <input type="radio" name="upload_type" value="first" checked onclick="togglePdfInputs('first')"> First Time Upload
-      <input type="radio" name="upload_type" value="comparison" onclick="togglePdfInputs('comparison')"> Compare with Previous
-    </div>
+      <div id="compare-fields">
+        <label for="old_path">Old Regulation PDF Path</label>
+        <input type="text" name="old_path" id="old_path" placeholder="/path/to/old_regulation.pdf">
 
-    <div id="oldPdfGroup" style="display: none;">
-      <label for="old_path">Old Regulation PDF Path</label>
-      <input type="text" name="old_path" placeholder="Path to old regulation PDF">
-    </div>
+        <label for="new_path">New Regulation PDF Path</label>
+        <input type="text" name="new_path" id="new_path" placeholder="/path/to/new_regulation.pdf">
+      </div>
 
-    <label for="new_path">New Regulation PDF Path</label>
-    <input type="text" name="new_path" required placeholder="Path to new regulation PDF">
+      <div id="first-time-field" class="hidden">
+        <label for="first_time_path">New Regulation PDF Path</label>
+        <input type="text" name="first_time_path" id="first_time_path" placeholder="/path/to/regulation.pdf">
+      </div>
 
-    <button type="submit">Upload & Process</button>
-  </form>
+      <button type="submit" class="btn-submit">Upload</button>
+    </form>
+  </div>
+
+  <script>
+    function toggleUploadMode() {
+      const mode = document.querySelector('input[name="upload_mode"]:checked').value;
+      const compareFields = document.getElementById("compare-fields");
+      const firstTimeField = document.getElementById("first-time-field");
+
+      if (mode === "compare") {
+        compareFields.classList.remove("hidden");
+        firstTimeField.classList.add("hidden");
+      } else {
+        compareFields.classList.add("hidden");
+        firstTimeField.classList.remove("hidden");
+      }
+    }
+
+    // Ensure correct visibility on page load
+    window.onload = toggleUploadMode;
+  </script>
 </body>
 </html>
