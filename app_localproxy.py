@@ -71,44 +71,65 @@ def markdown_to_docx(doc: Document, text: str):
 def process_upload(upload_id):
     upload = Upload.query.get(upload_id)
 
-    old_text = extract_text_from_pdf(upload.old_path)
-    old_summary = get_summary_with_context(old_text)
-
-    new_summary = None
-    if upload.new_path:
-        new_text = extract_text_from_pdf(upload.new_path)
-        new_summary = get_summary_with_context(new_text, context=old_summary)
-
+    # Clean existing entries for this upload ID
     db.session.query(Summary).filter_by(upload_id=upload.id).delete()
-    db.session.add(Summary(upload_id=upload.id, old_summary=old_summary, new_summary=new_summary))
-    db.session.commit()
+    db.session.query(EntityGraph).filter_by(upload_id=upload.id).delete()
 
-    old_json = get_entity_relationship_with_context(old_summary)
-    G_old = parse_graph_data(json.loads(old_json))
-    graph_old_json = json.dumps({
-        "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
-        "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
-    })
+    if not upload.old_path:
+        # First-time upload
+        new_text = extract_text_from_pdf(upload.new_path)
+        new_summary = get_summary_with_context(new_text)
+        new_json = get_entity_relationship_with_context(new_summary)
 
-    new_json = None
-    graph_new_json = None
-    if new_summary:
-        new_json = get_entity_relationship_with_context(new_summary, context=old_json)
         G_new = parse_graph_data(json.loads(new_json))
         graph_new_json = json.dumps({
             "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
             "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
         })
 
-    db.session.query(EntityGraph).filter_by(upload_id=upload.id).delete()
-    db.session.add(EntityGraph(
-        upload_id=upload.id,
-        old_json=old_json,
-        new_json=new_json,
-        graph_old=graph_old_json,
-        graph_new=graph_new_json
-    ))
+        db.session.add(Summary(upload_id=upload.id, old_summary=None, new_summary=new_summary))
+        db.session.add(EntityGraph(
+            upload_id=upload.id,
+            old_json=None,
+            new_json=new_json,
+            graph_old=None,
+            graph_new=graph_new_json
+        ))
+    else:
+        # Comparison upload
+        old_text = extract_text_from_pdf(upload.old_path)
+        new_text = extract_text_from_pdf(upload.new_path)
+
+        old_summary = get_summary_with_context(old_text)
+        new_summary = get_summary_with_context(new_text, context=old_summary)
+
+        old_json = get_entity_relationship_with_context(old_summary)
+        new_json = get_entity_relationship_with_context(new_summary, context=old_json)
+
+        G_old = parse_graph_data(json.loads(old_json))
+        G_new = parse_graph_data(json.loads(new_json))
+
+        graph_old_json = json.dumps({
+            "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
+            "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
+        })
+
+        graph_new_json = json.dumps({
+            "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
+            "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
+        })
+
+        db.session.add(Summary(upload_id=upload.id, old_summary=old_summary, new_summary=new_summary))
+        db.session.add(EntityGraph(
+            upload_id=upload.id,
+            old_json=old_json,
+            new_json=new_json,
+            graph_old=graph_old_json,
+            graph_new=graph_new_json
+        ))
+
     db.session.commit()
+
 
 @app.route("/compare/<int:upload_id>")
 def compare(upload_id):
