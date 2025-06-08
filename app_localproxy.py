@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from flask import Flask, request, render_template, redirect, url_for, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -7,7 +8,6 @@ from vertex_llm import init_vertexai, get_summary_with_context, get_entity_relat
 from utils import extract_text_from_pdf, parse_graph_data, generate_kop
 from db_models import db, Regulation, Upload, Summary, EntityGraph
 from docx import Document
-from docx.shared import Pt
 from io import BytesIO
 
 app = Flask(__name__)
@@ -25,8 +25,10 @@ def index():
         old_path = request.form['old_path'].strip()
         new_path = request.form['new_path'].strip()
 
-        if not (os.path.exists(old_path) and os.path.exists(new_path)):
-            return "One or both PDF paths are invalid.", 400
+        if not os.path.exists(old_path):
+            return "Old PDF path is invalid.", 400
+        if new_path and not os.path.exists(new_path):
+            return "New PDF path is invalid.", 400
 
         upload = Upload(regulation_id=regulation_id, old_path=old_path, new_path=new_path)
         db.session.add(upload)
@@ -44,24 +46,16 @@ def markdown_to_docx(doc: Document, text: str):
         if not stripped:
             doc.add_paragraph()
             continue
-
-        # Headings
         if stripped.startswith("###"):
             doc.add_heading(stripped.lstrip("#").strip(), level=3)
         elif stripped.startswith("##"):
             doc.add_heading(stripped.lstrip("#").strip(), level=2)
         elif stripped.startswith("#"):
             doc.add_heading(stripped.lstrip("#").strip(), level=1)
-
-        # Bullets
         elif stripped.startswith("- "):
             doc.add_paragraph(stripped[2:], style='List Bullet')
-
-        # Numbered list
         elif re.match(r'^\d+\.\s', stripped):
             doc.add_paragraph(re.sub(r'^\d+\.\s', '', stripped), style='List Number')
-
-        # Bold text
         elif "**" in stripped:
             para = doc.add_paragraph()
             while "**" in stripped:
@@ -77,33 +71,34 @@ def markdown_to_docx(doc: Document, text: str):
 def process_upload(upload_id):
     upload = Upload.query.get(upload_id)
 
-    # Extract text
     old_text = extract_text_from_pdf(upload.old_path)
-    new_text = extract_text_from_pdf(upload.new_path)
-
-    # Summarize
     old_summary = get_summary_with_context(old_text)
-    new_summary = get_summary_with_context(new_text, context=old_summary)
+
+    new_summary = None
+    if upload.new_path:
+        new_text = extract_text_from_pdf(upload.new_path)
+        new_summary = get_summary_with_context(new_text, context=old_summary)
+
     db.session.query(Summary).filter_by(upload_id=upload.id).delete()
     db.session.add(Summary(upload_id=upload.id, old_summary=old_summary, new_summary=new_summary))
     db.session.commit()
 
-    # Entity JSONs
     old_json = get_entity_relationship_with_context(old_summary)
-    new_json = get_entity_relationship_with_context(new_summary, context=old_json)
-
     G_old = parse_graph_data(json.loads(old_json))
-    G_new = parse_graph_data(json.loads(new_json))
-
     graph_old_json = json.dumps({
         "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
         "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
     })
 
-    graph_new_json = json.dumps({
-        "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
-        "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
-    })
+    new_json = None
+    graph_new_json = None
+    if new_summary:
+        new_json = get_entity_relationship_with_context(new_summary, context=old_json)
+        G_new = parse_graph_data(json.loads(new_json))
+        graph_new_json = json.dumps({
+            "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
+            "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
+        })
 
     db.session.query(EntityGraph).filter_by(upload_id=upload.id).delete()
     db.session.add(EntityGraph(
@@ -124,8 +119,11 @@ def graph_data(upload_id, version):
     graph_entry = EntityGraph.query.filter_by(upload_id=upload_id).first()
     if not graph_entry:
         return jsonify({"nodes": [], "edges": []})
-    graph_json = graph_entry.graph_old if version == "old" else graph_entry.graph_new
-    return jsonify(json.loads(graph_json))
+    if version == "old":
+        return jsonify(json.loads(graph_entry.graph_old or '{}'))
+    if version == "new":
+        return jsonify(json.loads(graph_entry.graph_new or '{}'))
+    return jsonify({"error": "Invalid version"}), 400
 
 @app.route("/regenerate/<int:upload_id>", methods=["POST"])
 def regenerate(upload_id):
@@ -134,13 +132,14 @@ def regenerate(upload_id):
 
 @app.route("/approve/<int:upload_id>", methods=["POST"])
 def approve(upload_id):
-    # Get summaries and entity graphs
     summary = Summary.query.filter_by(upload_id=upload_id).first()
     graph = EntityGraph.query.filter_by(upload_id=upload_id).first()
     if not summary or not graph:
         return "Data not found", 404
 
-    # Call LLM with prompt
+    if not summary.new_summary or not graph.new_json:
+        return "New data missing. Please upload new regulation first.", 400
+
     prompt = (
         "Given the original document, pickup the modality of reporting. "
         "Given this particular graph, pickup the necessary actions to be performed. "
@@ -149,14 +148,12 @@ def approve(upload_id):
         f"Entity Relationship JSON:\n{graph.new_json}"
     )
 
-    kop_response = get_summary_with_context(prompt)  # Reuse Gemini API logic
+    kop_response = get_summary_with_context(prompt)
 
-    # Create Word doc
     doc = Document()
     doc.add_heading("Key Operating Procedure (KOP)", 0)
     markdown_to_docx(doc, kop_response)
 
-    # Output to BytesIO stream
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
