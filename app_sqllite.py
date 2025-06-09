@@ -6,58 +6,34 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from vertex_llm import init_vertexai, get_summary_with_context, get_entity_relationship_with_context, get_kop_doc
 from utils import extract_text_from_pdf, parse_graph_data, markdown_to_docx
+from db_models import db, Regulation, Upload, Summary, EntityGraph
 from docx import Document
 from io import BytesIO
 
-# --- Initialize Flask and SQLite ---
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///regulation_ai.db'
+
+# Use SQLite database (local file-based)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///regulations.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+db.init_app(app)
 
-# --- Models ---
-class Regulation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), unique=True, nullable=False)
-
-class Upload(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    regulation_id = db.Column(db.Integer, db.ForeignKey('regulation.id'), nullable=False)
-    old_path = db.Column(db.Text)
-    new_path = db.Column(db.Text)
-    upload_time = db.Column(db.DateTime, default=datetime.utcnow)
-
-class Summary(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    upload_id = db.Column(db.Integer, db.ForeignKey('upload.id'), nullable=False)
-    old_summary = db.Column(db.Text)
-    new_summary = db.Column(db.Text)
-
-class EntityGraph(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    upload_id = db.Column(db.Integer, db.ForeignKey('upload.id'), nullable=False)
-    old_json = db.Column(db.Text)
-    new_json = db.Column(db.Text)
-    graph_old = db.Column(db.Text)
-    graph_new = db.Column(db.Text)
-
-# --- Initialize VertexAI ---
 init_vertexai()
 
+
 @app.before_first_request
-def setup():
-    db.create_all()
+def initialize_database():
+    with app.app_context():
+        db.create_all()
+        if not Regulation.query.first():
+            db.session.add_all([
+                Regulation(name="EMIR Refit"),
+                Regulation(name="MiFID II"),
+                Regulation(name="SFTR"),
+                Regulation(name="AWPR")
+            ])
+            db.session.commit()
 
-    if not Regulation.query.first():
-        db.session.add_all([
-            Regulation(name="EMIR Refit"),
-            Regulation(name="MiFID II"),
-            Regulation(name="SFTR"),
-            Regulation(name="AWPR")
-        ])
-        db.session.commit()
 
-# --- Routes ---
 @app.route("/", methods=["GET", "POST"])
 def index():
     regulations = Regulation.query.all()
@@ -84,8 +60,10 @@ def index():
 
     return render_template("index.html", regulations=regulations)
 
+
 def process_upload(upload_id):
     upload = Upload.query.get(upload_id)
+
     db.session.query(Summary).filter_by(upload_id=upload.id).delete()
     db.session.query(EntityGraph).filter_by(upload_id=upload.id).delete()
 
@@ -93,38 +71,60 @@ def process_upload(upload_id):
         new_text = extract_text_from_pdf(upload.new_path)
         new_summary = get_summary_with_context(new_text)
         new_json = get_entity_relationship_with_context(new_summary)
+
         G_new = parse_graph_data(json.loads(new_json))
         graph_new_json = json.dumps({
             "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
             "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
         })
+
         db.session.add(Summary(upload_id=upload.id, old_summary=None, new_summary=new_summary))
-        db.session.add(EntityGraph(upload_id=upload.id, old_json=None, new_json=new_json, graph_old=None, graph_new=graph_new_json))
+        db.session.add(EntityGraph(
+            upload_id=upload.id,
+            old_json=None,
+            new_json=new_json,
+            graph_old=None,
+            graph_new=graph_new_json
+        ))
     else:
         old_text = extract_text_from_pdf(upload.old_path)
         new_text = extract_text_from_pdf(upload.new_path)
+
         old_summary = get_summary_with_context(old_text)
         new_summary = get_summary_with_context(new_text, context=old_summary)
+
         old_json = get_entity_relationship_with_context(old_summary)
         new_json = get_entity_relationship_with_context(new_summary, context=old_json)
+
         G_old = parse_graph_data(json.loads(old_json))
         G_new = parse_graph_data(json.loads(new_json))
+
         graph_old_json = json.dumps({
             "nodes": [{"id": n, **G_old.nodes[n]} for n in G_old.nodes],
             "edges": [{"from": u, "to": v, **G_old[u][v]} for u, v in G_old.edges]
         })
+
         graph_new_json = json.dumps({
             "nodes": [{"id": n, **G_new.nodes[n]} for n in G_new.nodes],
             "edges": [{"from": u, "to": v, **G_new[u][v]} for u, v in G_new.edges]
         })
+
         db.session.add(Summary(upload_id=upload.id, old_summary=old_summary, new_summary=new_summary))
-        db.session.add(EntityGraph(upload_id=upload.id, old_json=old_json, new_json=new_json, graph_old=graph_old_json, graph_new=graph_new_json))
+        db.session.add(EntityGraph(
+            upload_id=upload.id,
+            old_json=old_json,
+            new_json=new_json,
+            graph_old=graph_old_json,
+            graph_new=graph_new_json
+        ))
 
     db.session.commit()
+
 
 @app.route("/compare/<int:upload_id>")
 def compare(upload_id):
     return render_template("compare.html", upload_id=upload_id)
+
 
 @app.route("/graph_data/<int:upload_id>/<version>")
 def graph_data(upload_id, version):
@@ -137,10 +137,12 @@ def graph_data(upload_id, version):
         return jsonify(json.loads(graph_entry.graph_new or '{}'))
     return jsonify({"error": "Invalid version"}), 400
 
+
 @app.route("/regenerate/<int:upload_id>", methods=["POST"])
 def regenerate(upload_id):
     process_upload(upload_id)
     return redirect(url_for("compare", upload_id=upload_id))
+
 
 @app.route("/approve/<int:upload_id>", methods=["POST"])
 def approve(upload_id):
@@ -148,15 +150,19 @@ def approve(upload_id):
     graph = EntityGraph.query.filter_by(upload_id=upload_id).first()
     if not summary or not graph:
         return "Data not found", 404
+
     if not summary.new_summary or not graph.new_json:
         return "New data missing. Please upload new regulation first.", 400
+
     kop_text = get_kop_doc(new_summary=summary.new_summary, new_json_str=graph.new_json)
     doc = Document()
     doc.add_heading("Key Operating Procedure (KOP)", 0)
     markdown_to_docx(doc, kop_text)
+
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
+
     return send_file(
         buffer,
         as_attachment=True,
@@ -164,21 +170,12 @@ def approve(upload_id):
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
 
+
 @app.route("/history")
 def history():
     uploads = Upload.query.order_by(Upload.upload_time.desc()).all()
     return render_template("history.html", uploads=uploads)
 
-# --- Main: Create DB and seed initial data ---
+
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        if not Regulation.query.first():
-            db.session.add_all([
-                Regulation(name="EMIR Refit"),
-                Regulation(name="MiFID II"),
-                Regulation(name="SFTR"),
-                Regulation(name="AWPR")
-            ])
-            db.session.commit()
     app.run(debug=True)
