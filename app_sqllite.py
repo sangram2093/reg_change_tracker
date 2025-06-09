@@ -11,9 +11,7 @@ from docx import Document
 from io import BytesIO
 
 app = Flask(__name__)
-
-# ✅ Use SQLite instead of PostgreSQL
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///regulation_ai.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///regulation_ai.db'  # SQLite
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
@@ -48,10 +46,12 @@ def index():
 def process_upload(upload_id):
     upload = Upload.query.get(upload_id)
 
+    # Clear previous entries for same upload
     db.session.query(Summary).filter_by(upload_id=upload.id).delete()
     db.session.query(EntityGraph).filter_by(upload_id=upload.id).delete()
 
     if not upload.old_path:
+        # First-time upload
         new_text = extract_text_from_pdf(upload.new_path)
         new_summary = get_summary_with_context(new_text)
         new_json = get_entity_relationship_with_context(new_summary)
@@ -71,6 +71,7 @@ def process_upload(upload_id):
             graph_new=graph_new_json
         ))
     else:
+        # Comparative upload
         old_text = extract_text_from_pdf(upload.old_path)
         new_text = extract_text_from_pdf(upload.new_path)
 
@@ -133,7 +134,7 @@ def approve(upload_id):
 
     if not summary.new_summary or not graph.new_json:
         return "New data missing. Please upload new regulation first.", 400
-    
+
     kop_text = get_kop_doc(new_summary=summary.new_summary, new_json_str=graph.new_json)
     doc = Document()
     doc.add_heading("Key Operating Procedure (KOP)", 0)
@@ -162,7 +163,8 @@ if __name__ == "__main__":
             db.session.add_all([
                 Regulation(name="EMIR Refit"),
                 Regulation(name="MiFID II"),
-                Regulation(name="SFTR")
+                Regulation(name="SFTR"),
+                Regulation(name="AWPR")
             ])
             db.session.commit()
     app.run(debug=True)
