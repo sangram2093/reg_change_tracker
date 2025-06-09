@@ -157,14 +157,17 @@ def history():
     return render_template("history.html", uploads=uploads)
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        if not Regulation.query.first():
-            db.session.add_all([
-                Regulation(name="EMIR Refit"),
-                Regulation(name="MiFID II"),
-                Regulation(name="SFTR"),
-                Regulation(name="AWPR")
-            ])
-            db.session.commit()
+    app.app_context().push()  # ← Pushes app context explicitly
+    db.create_all()
+
+    # Add seed data for first run
+    if not Regulation.query.first():
+        db.session.add_all([
+            Regulation(name="EMIR Refit"),
+            Regulation(name="MiFID II"),
+            Regulation(name="SFTR"),
+            Regulation(name="AWPR")
+        ])
+        db.session.commit()
+
     app.run(debug=True)
