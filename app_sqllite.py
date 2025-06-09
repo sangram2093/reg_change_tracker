@@ -44,6 +44,19 @@ class EntityGraph(db.Model):
 # --- Initialize VertexAI ---
 init_vertexai()
 
+@app.before_first_request
+def setup():
+    db.create_all()
+
+    if not Regulation.query.first():
+        db.session.add_all([
+            Regulation(name="EMIR Refit"),
+            Regulation(name="MiFID II"),
+            Regulation(name="SFTR"),
+            Regulation(name="AWPR")
+        ])
+        db.session.commit()
+
 # --- Routes ---
 @app.route("/", methods=["GET", "POST"])
 def index():
