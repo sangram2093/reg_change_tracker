@@ -19,21 +19,6 @@ db.init_app(app)
 
 init_vertexai()
 
-
-@app.before_first_request
-def initialize_database():
-    with app.app_context():
-        db.create_all()
-        if not Regulation.query.first():
-            db.session.add_all([
-                Regulation(name="EMIR Refit"),
-                Regulation(name="MiFID II"),
-                Regulation(name="SFTR"),
-                Regulation(name="AWPR")
-            ])
-            db.session.commit()
-
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     regulations = Regulation.query.all()
@@ -178,4 +163,17 @@ def history():
 
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+
+        # Insert default regulations only if not already present
+        if not Regulation.query.first():
+            db.session.add_all([
+                Regulation(name="EMIR Refit"),
+                Regulation(name="MiFID II"),
+                Regulation(name="SFTR"),
+                Regulation(name="AWPR")
+            ])
+            db.session.commit()
+
     app.run(debug=True)
